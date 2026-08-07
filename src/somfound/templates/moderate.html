@@ -11,7 +11,7 @@
   {% for r in pending %}
   <article class="report-card">
     <header>
-      <strong>{{ category_labels[r.category] }}</strong> · {{ r.urgency.value }} · via {{ r.source_channel.value }}
+      <strong>{{ category_labels[r.category] }}</strong> · {{ urgency_labels[r.urgency] }} · via {{ r.source_channel.value }}
       <span class="timestamp">{{ r.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
     </header>
     <p>{{ r.description }}</p>
@@ -32,7 +32,7 @@
   {% for r in published %}
   <article class="report-card">
     <header>
-      <strong>{{ category_labels[r.category] }}</strong> · {{ r.urgency.value }}
+      <strong>{{ category_labels[r.category] }}</strong> · {{ urgency_labels[r.urgency] }}
       <span class="timestamp">published {{ r.published_at.strftime('%Y-%m-%d %H:%M UTC') if r.published_at else '' }}</span>
     </header>
     <p>{{ r.description }}</p>

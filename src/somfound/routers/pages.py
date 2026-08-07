@@ -7,10 +7,19 @@ from sqlmodel import Session
 
 from somfound import crud
 from somfound.db import get_session
-from somfound.models import CATEGORY_LABELS, Category, SourceChannel, Urgency
+from somfound.models import (
+    CATEGORY_ICONS,
+    CATEGORY_LABELS,
+    URGENCY_COLORS,
+    URGENCY_LABELS,
+    Category,
+    SourceChannel,
+    Urgency,
+)
+from somfound.paths import TEMPLATES_DIR
 
 router = APIRouter(tags=["pages"])
-templates = Jinja2Templates(directory="src/somfound/templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 @router.get("/")
@@ -20,7 +29,13 @@ def map_page(request: Request):
         "map.html",
         {
             "categories": [(c.value, label) for c, label in CATEGORY_LABELS.items()],
-            "urgencies": [u.value for u in Urgency],
+            "urgencies": [(u.value, label) for u, label in URGENCY_LABELS.items()],
+            "urgency_legend": [
+                {"label": label, "color": URGENCY_COLORS[u]} for u, label in URGENCY_LABELS.items()
+            ],
+            "category_legend": [
+                {"label": label, "icon": CATEGORY_ICONS[c]} for c, label in CATEGORY_LABELS.items()
+            ],
         },
     )
 
@@ -33,7 +48,7 @@ def report_form(request: Request, submitted: bool = False, session: Session = De
         {
             "villages": crud.list_villages(session),
             "categories": [(c.value, label) for c, label in CATEGORY_LABELS.items()],
-            "urgencies": [u.value for u in Urgency],
+            "urgencies": [(u.value, label) for u, label in URGENCY_LABELS.items()],
             "submitted": submitted,
         },
     )

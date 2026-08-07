@@ -9,10 +9,11 @@ from sqlmodel import Session, select
 from somfound import crud
 from somfound.auth import require_moderator
 from somfound.db import get_session
-from somfound.models import CATEGORY_LABELS, Report, Status
+from somfound.models import CATEGORY_LABELS, URGENCY_LABELS, Report, Status
+from somfound.paths import TEMPLATES_DIR
 
 router = APIRouter(prefix="/moderate", tags=["moderation"])
-templates = Jinja2Templates(directory="src/somfound/templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 @router.get("")
@@ -30,7 +31,12 @@ def moderation_queue(
     return templates.TemplateResponse(
         request,
         "moderate.html",
-        {"pending": pending, "published": published, "category_labels": CATEGORY_LABELS},
+        {
+            "pending": pending,
+            "published": published,
+            "category_labels": CATEGORY_LABELS,
+            "urgency_labels": URGENCY_LABELS,
+        },
     )
 
 

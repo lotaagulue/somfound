@@ -2,6 +2,8 @@
 
 **Somfound** turns word-of-mouth into a shared, visual picture of what's happening on the ground in a community — starting with a pilot in Anambra State, Nigeria. Anyone can report crime/safety concerns, infrastructure issues, community needs (water, medical help, etc.), or positive local news (a new school, a new borehole) — from a smartphone browser or by plain SMS. Reports show up as color-coded points on a live map so villagers, local leaders, and outside partners (NGOs, government, diaspora) get a real-time, place-based view instead of relying on rumor.
 
+> This repo is a demo build for an already-operating South-East Nigeria community-development nonprofit — not a from-scratch hypothetical. See [CLAUDE.md](CLAUDE.md) for that context and the technical architecture.
+
 ## 1. Problem
 
 In many Nigerian villages, information about local events — a robbery, a burst water line, a new clinic opening — spreads by word of mouth, unevenly and often too slowly to act on. There's no shared, place-anchored record that a whole village (or the people who left it) can check. Meanwhile most residents have basic phones, not smartphones, so any solution that only works through an app or WhatsApp excludes the people closest to the ground.
@@ -47,11 +49,18 @@ In many Nigerian villages, information about local events — a robbery, a burst
 
 | Color | Level | Meaning |
 | --- | --- | --- |
-| 🔴 Red | Critical | active danger, needs immediate attention |
-| 🟠 Orange | High | urgent unmet need, not immediately life-threatening |
-| 🟡 Yellow | Moderate | ongoing issue, worth knowing, not urgent |
-| 🔵 Blue | Informational | neutral/positive news, FYI |
+| 🔴 Red (`#d03b3b`) | Critical | active danger, needs immediate attention |
+| 🟠 Coral (`#ec835a`) | High | urgent unmet need, not immediately life-threatening |
+| 🟡 Amber (`#fab219`) | Moderate | ongoing issue, worth knowing, not urgent |
+| 🟢 Green (`#0ca30c`) | Informational | neutral/positive news, FYI |
 | ⚪ Grey | Pending | submitted, not yet moderator-reviewed |
+
+These are the `dataviz` skill's validated status palette (good/warning/serious/critical), not
+an arbitrary red/orange/yellow/blue pick — a plain categorical ramp failed colorblind and
+normal-vision separation checks between adjacent severities, which matters when the map is
+showing crime/safety data. Because two of these steps sit under 3:1 contrast on a light
+background by design, the app always pairs urgency with a label/icon on screen (map legend,
+popups, moderation queue) rather than relying on the color dot alone.
 
 Keeping category (icon) and urgency (color) as two separate dimensions means a "water shortage" and a "burst pipe" both show as the 💧 icon, but can carry different color/urgency depending on severity.
 
@@ -175,9 +184,33 @@ curl -X POST http://localhost:8000/sms/inbound \
 
 That creates a `pending` report, parsed into category `needs_resources` / urgency `high`, matched to the Umuoji village coordinates — visible at `/moderate` for approval. For a closer-to-real test, sign up for Africa's Talking's **free sandbox** (<https://account.africastalking.com/>), point its SMS callback URL at your deployed `/sms/inbound` endpoint, and text their simulator number from their dashboard.
 
-## 12. Deploying for free (Render)
+## 12. Deploying for free (Vercel — used for the live interactive demo)
+
+The app runs as a single Vercel Python serverless function (`api/index.py`), with every
+route rewritten to it via `vercel.json` so the whole FastAPI app — pages, JSON API, SMS
+webhook — is served from one deployment. No separate frontend/backend split needed.
 
 1. Push this repo to GitHub (already done — <https://github.com/lotaagulue/somfound>).
-2. In the [Render dashboard](https://dashboard.render.com/), **New → Blueprint**, connect the repo. `render.yaml` at the repo root defines a free web service (`uv sync` build, `uvicorn` start) — Render picks it up automatically.
-3. Set the env vars it prompts for (`MODERATOR_USERNAME`, `MODERATOR_PASSWORD`; `AT_USERNAME`/`AT_API_KEY` only if wiring up real SMS confirmations) — all optional, the app runs with safe demo defaults if left blank.
-4. Deploy. Free tier notes: the service sleeps after ~15 minutes idle (cold-starts on the next visit) and the filesystem is not persistent across deploys, so the SQLite demo data resets to the seeded baseline on every redeploy/restart — expected and fine for a demo, not for a real pilot (that needs a persistent DB — swap `DATABASE_URL` for a free-tier Postgres, e.g. Render's or [Neon](https://neon.tech), when this graduates past demo stage).
+2. In the [Vercel dashboard](https://vercel.com/new), **Add New → Project**, import the repo. Vercel should auto-detect the Python runtime from `vercel.json` + `requirements.txt`; no build command changes needed.
+3. Set env vars under Project Settings if you want non-default moderator credentials (`MODERATOR_USERNAME`, `MODERATOR_PASSWORD`) or real SMS confirmations (`AT_USERNAME`, `AT_API_KEY`) — all optional, safe demo defaults otherwise.
+4. Deploy. Point Africa's Talking's sandbox SMS callback at `https://<your-app>.vercel.app/sms/inbound` to demo the SMS pipeline against the live URL.
+
+**Known limitation:** Vercel's filesystem is read-only except `/tmp`, so `db.py` stores the
+SQLite file there automatically when it detects Vercel's environment. `/tmp` persists only
+for the lifetime of a *warm* serverless instance — a cold start (first request after idle,
+or a fresh instance under concurrent traffic) gets a freshly reseeded demo DB, and a report
+submitted in one instance may not be visible from a different concurrent instance. Fine, even
+expected, for a single presenter walking through the demo in one sitting; not something to
+rely on for multiple simultaneous users or data that must survive between sessions. If that
+matters before this graduates past demo stage, swap `DATABASE_URL` for a free-tier Postgres
+(e.g. [Neon](https://neon.tech)) — no code changes needed beyond that env var.
+
+Regardless of host, requesting the pilot LGA/village data (§10) will still need updating —
+none of this deploys real village data, only the placeholder seed set (§11).
+
+### Alternative: Render
+
+`render.yaml` at the repo root also works if you'd rather deploy to
+[Render](https://dashboard.render.com/) (**New → Blueprint**) instead of Vercel — same free-tier
+tradeoffs (sleeps on idle, non-persistent disk across deploys), same env vars, same Postgres
+upgrade path when needed.
