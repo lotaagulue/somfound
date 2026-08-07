@@ -11,3 +11,8 @@ wheels/
 
 # Local Claude Code tooling (not project source)
 .claude/
+
+# App runtime
+*.db
+.env
+

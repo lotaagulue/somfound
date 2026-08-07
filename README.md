@@ -97,26 +97,26 @@ ModerationAction
   id, report_id, moderator_id, action, notes, created_at
 ```
 
-## 6. Proposed architecture
+## 6. Architecture (as built)
 
-Keeping this to one stack given the repo is already a Python/`uv` project:
+One stack, kept deliberately small so the demo runs on **entirely free infrastructure**:
 
-- **Backend:** FastAPI (Python) — REST API for report submission, map queries, moderator actions.
-- **Database:** PostgreSQL + PostGIS — geospatial queries (points near a village, bounding-box map queries) are first-class, not bolted on.
-- **Frontend:** Server-rendered pages (Jinja2 + HTMX) + Leaflet.js for the map. This avoids standing up a separate JS build/deploy for an MVP — one deployable app, one team member can run it. (Revisit a React/Next.js frontend later if the map/UI outgrows this.)
-- **SMS gateway:** [Africa's Talking](https://africastalking.com/) — the standard SMS API provider for Nigeria, supports shortcodes and (later) USSD, reasonable local delivery rates. Inbound SMS hits a webhook on the FastAPI backend; a keyword parser assigns category/urgency and creates a `pending` Report.
-- **Moderator dashboard:** simple authenticated pages in the same app (no separate admin tool needed for MVP).
-- **Hosting:** a single small Postgres + app host (Render/Fly.io/Railway) is enough for a pilot; revisit if traffic/geography demands it.
+- **Backend:** FastAPI (Python) — REST API + server-rendered pages for report submission, map queries, moderator actions.
+- **Database:** SQLite via SQLModel — zero-cost, zero-setup, no separate DB service to pay for or manage. `DATABASE_URL` can point at Postgres later with no code changes when this needs a real pilot deployment (PostGIS was the original proposal for real geospatial queries at scale — SQLite is a deliberate demo-stage simplification, fine at this data volume).
+- **Frontend:** Server-rendered Jinja2 pages + Leaflet.js (via CDN) for the map. No JS build step, no Node toolchain, one deployable app.
+- **SMS gateway:** [Africa's Talking](https://africastalking.com/) — inbound SMS hits a webhook (`POST /sms/inbound`) in the FastAPI backend; a keyword parser assigns category/urgency and creates a `pending` Report. Their **sandbox simulator is free** and is what the demo is built/tested against — no telco shortcode purchase needed to prove the pipeline works.
+- **Moderator dashboard:** `/moderate`, HTTP Basic auth, same app — no separate admin tool.
+- **Hosting:** [Render](https://render.com)'s free web service tier — see §12.
 
 ## 7. MVP scope (pilot: one LGA in Anambra State)
 
-- Web report form (no login, GPS or manual pin)
-- SMS report to one shortcode, free-text with keyword parsing
-- Public map with the 5 categories / 4 urgency colors, filterable
-- Moderator queue (approve/edit/reject/resolve)
-- A short list of known villages/wards in the pilot LGA to anchor locations
+- ✅ Web report form (no login, GPS or manual pin) — `/report`
+- ✅ SMS report via free-text keyword parsing — `POST /sms/inbound`
+- ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date — `/`
+- ✅ Moderator queue (approve/reject/resolve) — `/moderate`
+- ✅ Seed village list to anchor locations (placeholder cluster — see §10)
 
-Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-language (Igbo) UI, native mobile app, analytics dashboard for government/NGO partners, monetization.
+Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-language (Igbo) UI, native mobile app, analytics dashboard for government/NGO partners, monetization, photo uploads.
 
 ## 8. Key risks & mitigations
 
@@ -139,7 +139,45 @@ Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-
 
 ## 10. Open questions
 
-- Which specific LGA/villages in Anambra State for the pilot, and do we already have contacts there to seed moderation and initial reports?
+- Which specific LGA/villages in Anambra State for the pilot, and do we already have contacts there to seed moderation and initial reports? (The seeded demo data uses a placeholder Idemili North cluster — see §11.)
 - Who moderates at launch — and what's the expected report volume they need to handle?
 - Budget for the Africa's Talking shortcode/SMS costs during pilot?
 - Should web reporters be able to optionally leave a phone number for follow-up (e.g., "water fixed, can you confirm?"), and how is that stored/used?
+
+## 11. Running the MVP demo locally
+
+Requires `uv` (already used to manage this project) — no other services to install.
+
+```bash
+uv sync                      # installs dependencies incl. dev/test tools
+uv run uvicorn somfound.main:app --reload
+```
+
+Then open:
+
+- `http://localhost:8000/` — the public map (seeded with demo reports around a placeholder Anambra village cluster)
+- `http://localhost:8000/report` — submit a web report
+- `http://localhost:8000/moderate` — moderator queue (HTTP Basic auth; defaults to `moderator` / `somfound-demo` — override via `MODERATOR_USERNAME` / `MODERATOR_PASSWORD` env vars before any real deployment)
+
+Run the test suite: `uv run pytest`.
+
+The database is a local SQLite file (`somfound.db`, gitignored) that's created and seeded automatically on first run — delete it to reset to a clean demo state.
+
+### Testing SMS without a phone or paying for anything
+
+Simulate an inbound SMS directly against the webhook the same way Africa's Talking's callback would:
+
+```bash
+curl -X POST http://localhost:8000/sms/inbound \
+  -d "from=+2348012345678" \
+  -d "text=WATER Umuoji borehole broken 3 days no fix"
+```
+
+That creates a `pending` report, parsed into category `needs_resources` / urgency `high`, matched to the Umuoji village coordinates — visible at `/moderate` for approval. For a closer-to-real test, sign up for Africa's Talking's **free sandbox** (<https://account.africastalking.com/>), point its SMS callback URL at your deployed `/sms/inbound` endpoint, and text their simulator number from their dashboard.
+
+## 12. Deploying for free (Render)
+
+1. Push this repo to GitHub (already done — <https://github.com/lotaagulue/somfound>).
+2. In the [Render dashboard](https://dashboard.render.com/), **New → Blueprint**, connect the repo. `render.yaml` at the repo root defines a free web service (`uv sync` build, `uvicorn` start) — Render picks it up automatically.
+3. Set the env vars it prompts for (`MODERATOR_USERNAME`, `MODERATOR_PASSWORD`; `AT_USERNAME`/`AT_API_KEY` only if wiring up real SMS confirmations) — all optional, the app runs with safe demo defaults if left blank.
+4. Deploy. Free tier notes: the service sleeps after ~15 minutes idle (cold-starts on the next visit) and the filesystem is not persistent across deploys, so the SQLite demo data resets to the seeded baseline on every redeploy/restart — expected and fine for a demo, not for a real pilot (that needs a persistent DB — swap `DATABASE_URL` for a free-tier Postgres, e.g. Render's or [Neon](https://neon.tech), when this graduates past demo stage).

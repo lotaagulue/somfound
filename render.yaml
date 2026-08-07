@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: somfound
+    runtime: python
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn somfound.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MODERATOR_USERNAME
+        sync: false
+      - key: MODERATOR_PASSWORD
+        sync: false
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false

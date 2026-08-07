@@ -1,0 +1,64 @@
+"""Public-facing HTML pages: the map and the web report form."""
+
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from sqlmodel import Session
+
+from somfound import crud
+from somfound.db import get_session
+from somfound.models import CATEGORY_LABELS, Category, SourceChannel, Urgency
+
+router = APIRouter(tags=["pages"])
+templates = Jinja2Templates(directory="src/somfound/templates")
+
+
+@router.get("/")
+def map_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "map.html",
+        {
+            "categories": [(c.value, label) for c, label in CATEGORY_LABELS.items()],
+            "urgencies": [u.value for u in Urgency],
+        },
+    )
+
+
+@router.get("/report")
+def report_form(request: Request, submitted: bool = False, session: Session = Depends(get_session)):
+    return templates.TemplateResponse(
+        request,
+        "report_form.html",
+        {
+            "villages": crud.list_villages(session),
+            "categories": [(c.value, label) for c, label in CATEGORY_LABELS.items()],
+            "urgencies": [u.value for u in Urgency],
+            "submitted": submitted,
+        },
+    )
+
+
+@router.post("/report")
+def submit_report(
+    category: Category = Form(...),
+    urgency: Urgency = Form(...),
+    description: str = Form(...),
+    lat: float = Form(...),
+    lon: float = Form(...),
+    village_id: int | None = Form(None),
+    phone: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    crud.create_report(
+        session,
+        category=category,
+        urgency=urgency,
+        description=description,
+        lat=lat,
+        lon=lon,
+        village_id=village_id,
+        source_channel=SourceChannel.WEB,
+        reporter_contact=phone,
+    )
+    return RedirectResponse(url="/report?submitted=1", status_code=303)
