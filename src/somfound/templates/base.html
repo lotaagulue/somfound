@@ -4,12 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Somfound{% endblock %}</title>
+  <meta name="description" content="Somfound — community reporting and a live map for villages in South-East Nigeria.">
   <link rel="stylesheet" href="/static/style.css">
   {% block head %}{% endblock %}
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">Somfound</a>
+    <a class="brand" href="/">
+      <span class="brand-mark">Som<span class="brand-mark-accent">Found</span></span>
+    </a>
     <nav>
       <a href="/">Map</a>
       <a href="/report">Report something</a>
@@ -19,5 +22,8 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  <footer class="footer">
+    <p>Somfound — community-led development for South-East Nigeria. This is a demo build of the reporting platform.</p>
+  </footer>
 </body>
 </html>

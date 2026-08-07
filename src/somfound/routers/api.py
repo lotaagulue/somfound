@@ -9,6 +9,7 @@ from somfound.models import (
     CATEGORY_ICONS,
     CATEGORY_LABELS,
     URGENCY_COLORS,
+    URGENCY_LABELS,
     Category,
     Urgency,
 )
@@ -33,6 +34,7 @@ def api_list_reports(
             "category_label": CATEGORY_LABELS[r.category],
             "icon": CATEGORY_ICONS[r.category],
             "urgency": r.urgency.value,
+            "urgency_label": URGENCY_LABELS[r.urgency],
             "color": URGENCY_COLORS[r.urgency],
             "status": r.status.value,
             "description": r.description,

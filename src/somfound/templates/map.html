@@ -5,6 +5,9 @@
 {% endblock %}
 {% block content %}
 <section class="map-page">
+  <h1>What's happening in the community</h1>
+  <p class="hint">Reports from villagers — by web or SMS — after a moderator has reviewed them. Tap a point for details.</p>
+
   <div class="filters">
     <label>Category
       <select id="filter-category">
@@ -17,8 +20,8 @@
     <label>Urgency
       <select id="filter-urgency">
         <option value="">All</option>
-        {% for u in urgencies %}
-        <option value="{{ u }}">{{ u|capitalize }}</option>
+        {% for value, label in urgencies %}
+        <option value="{{ value }}">{{ label }}</option>
         {% endfor %}
       </select>
     </label>
@@ -31,8 +34,23 @@
       </select>
     </label>
   </div>
+
   <div id="map"></div>
-  <p class="hint">Colors show urgency (red = critical → blue = informational). Icons show category. Tap a point for details. Reports here have already passed moderator review.</p>
+
+  <div class="legend">
+    <div class="legend-group">
+      <span class="legend-group-title">Urgency</span>
+      {% for item in urgency_legend %}
+      <span class="legend-item"><span class="legend-swatch" style="background:{{ item.color }}"></span>{{ item.label }}</span>
+      {% endfor %}
+    </div>
+    <div class="legend-group">
+      <span class="legend-group-title">Category</span>
+      {% for item in category_legend %}
+      <span class="legend-item">{{ item.icon }} {{ item.label }}</span>
+      {% endfor %}
+    </div>
+  </div>
 </section>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -68,7 +86,7 @@
       });
       const marker = L.marker([r.lat, r.lon], { icon });
       marker.bindPopup(
-        `<strong>${r.category_label}</strong> · ${r.urgency}<br>` +
+        `<strong>${r.category_label}</strong> · ${r.urgency_label}<br>` +
         `${r.description}<br>` +
         `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>`
       );

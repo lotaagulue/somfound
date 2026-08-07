@@ -19,8 +19,8 @@
 
     <label>Urgency
       <select name="urgency" required>
-        {% for u in urgencies %}
-        <option value="{{ u }}">{{ u|capitalize }}</option>
+        {% for value, label in urgencies %}
+        <option value="{{ value }}">{{ label }}</option>
         {% endfor %}
       </select>
     </label>

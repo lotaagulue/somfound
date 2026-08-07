@@ -10,7 +10,10 @@ from collections.abc import Generator
 
 from sqlmodel import Session, SQLModel, create_engine
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./somfound.db")
+# Vercel's serverless filesystem is read-only except /tmp — fall back there
+# automatically so the same code works locally, on Render, and on Vercel.
+_default_sqlite = "sqlite:////tmp/somfound.db" if os.environ.get("VERCEL") else "sqlite:///./somfound.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", _default_sqlite)
 
 _connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=_connect_args)

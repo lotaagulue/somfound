@@ -16,3 +16,7 @@ wheels/
 *.db
 .env
 
+# Local-only business documents — contains the founder's personal contact
+# details and photos of community members/children; not for the public repo.
+SomFound Business Plan.pdf
+

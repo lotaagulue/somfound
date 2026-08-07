@@ -53,11 +53,24 @@ CATEGORY_ICONS: dict[Category, str] = {
     Category.OTHER: "❓",  # question mark
 }
 
+URGENCY_LABELS: dict[Urgency, str] = {
+    Urgency.CRITICAL: "Critical",
+    Urgency.HIGH: "High",
+    Urgency.MODERATE: "Moderate",
+    Urgency.INFORMATIONAL: "Informational",
+}
+
+# A validated status palette (good/warning/serious/critical) — chosen over a
+# plain red/orange/yellow/blue ramp because that one fails colorblind and
+# normal-vision separation between adjacent steps (checked with the dataviz
+# skill's palette validator). Because "warning"/"serious" sit under 3:1
+# contrast on a light surface by design, urgency must always be paired with
+# a label or icon on screen — never color alone (see map legend + popups).
 URGENCY_COLORS: dict[Urgency, str] = {
-    Urgency.CRITICAL: "#dc2626",  # red
-    Urgency.HIGH: "#ea580c",  # orange
-    Urgency.MODERATE: "#ca8a04",  # yellow/gold
-    Urgency.INFORMATIONAL: "#2563eb",  # blue
+    Urgency.CRITICAL: "#d03b3b",
+    Urgency.HIGH: "#ec835a",
+    Urgency.MODERATE: "#fab219",
+    Urgency.INFORMATIONAL: "#0ca30c",
 }
 PENDING_COLOR = "#9ca3af"  # grey, used for anything not yet published
 
