@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Moderator queue — Somfound{% endblock %}
+{% block content %}
+<section class="moderate-page">
+  <h1>Moderator queue</h1>
+
+  <h2>Pending review ({{ pending|length }})</h2>
+  {% if not pending %}
+  <p class="hint">Nothing waiting — new web and SMS reports will show up here.</p>
+  {% endif %}
+  {% for r in pending %}
+  <article class="report-card">
+    <header>
+      <strong>{{ category_labels[r.category] }}</strong> · {{ r.urgency.value }} · via {{ r.source_channel.value }}
+      <span class="timestamp">{{ r.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+    </header>
+    <p>{{ r.description }}</p>
+    {% if r.location_hint %}<p class="hint">Location hint (unmatched): {{ r.location_hint }}</p>{% endif %}
+    <p class="hint">Coordinates: {{ "%.4f"|format(r.lat) }}, {{ "%.4f"|format(r.lon) }}</p>
+    <form method="post" action="/moderate/{{ r.id }}/approve" class="inline-form">
+      <input type="text" name="notes" placeholder="Optional moderator notes">
+      <button type="submit" class="btn-approve">Approve</button>
+    </form>
+    <form method="post" action="/moderate/{{ r.id }}/reject" class="inline-form">
+      <input type="text" name="notes" placeholder="Reason for rejection">
+      <button type="submit" class="btn-reject">Reject</button>
+    </form>
+  </article>
+  {% endfor %}
+
+  <h2>Published — mark resolved ({{ published|length }})</h2>
+  {% for r in published %}
+  <article class="report-card">
+    <header>
+      <strong>{{ category_labels[r.category] }}</strong> · {{ r.urgency.value }}
+      <span class="timestamp">published {{ r.published_at.strftime('%Y-%m-%d %H:%M UTC') if r.published_at else '' }}</span>
+    </header>
+    <p>{{ r.description }}</p>
+    <form method="post" action="/moderate/{{ r.id }}/resolve" class="inline-form">
+      <button type="submit" class="btn-resolve">Mark resolved</button>
+    </form>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

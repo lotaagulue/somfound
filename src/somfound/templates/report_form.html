@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Report something — Somfound{% endblock %}
+{% block content %}
+<section class="form-page">
+  <h1>Report something</h1>
+  {% if submitted %}
+  <p class="banner banner-success">Thanks — your report was submitted and is waiting for moderator review before it appears on the map.</p>
+  {% endif %}
+  <p class="hint">No smartphone? Text the same details to our SMS line instead — see the SMS demo section on the map page.</p>
+
+  <form method="post" action="/report" id="report-form">
+    <label>Category
+      <select name="category" required>
+        {% for value, label in categories %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>Urgency
+      <select name="urgency" required>
+        {% for u in urgencies %}
+        <option value="{{ u }}">{{ u|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>What's happening?
+      <textarea name="description" rows="4" required placeholder="Short description — what, where, when"></textarea>
+    </label>
+
+    <label>Nearest village
+      <select name="village_id" id="village-select">
+        <option value="">— pick a village —</option>
+        {% for v in villages %}
+        <option value="{{ v.id }}" data-lat="{{ v.lat }}" data-lon="{{ v.lon }}">{{ v.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <div class="location-row">
+      <button type="button" id="use-location">Use my current location instead</button>
+      <span id="location-status"></span>
+    </div>
+    <input type="hidden" name="lat" id="lat">
+    <input type="hidden" name="lon" id="lon">
+
+    <label>Phone number <span class="optional">(optional — only used if a moderator needs to follow up, never shown publicly)</span>
+      <input type="tel" name="phone" placeholder="+234...">
+    </label>
+
+    <button type="submit">Submit report</button>
+  </form>
+</section>
+
+<script>
+  const villageSelect = document.getElementById('village-select');
+  const latInput = document.getElementById('lat');
+  const lonInput = document.getElementById('lon');
+  const status = document.getElementById('location-status');
+
+  villageSelect.addEventListener('change', () => {
+    const opt = villageSelect.selectedOptions[0];
+    if (opt && opt.dataset.lat) {
+      latInput.value = opt.dataset.lat;
+      lonInput.value = opt.dataset.lon;
+      status.textContent = '';
+    }
+  });
+
+  document.getElementById('use-location').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      status.textContent = 'Geolocation not supported on this device.';
+      return;
+    }
+    status.textContent = 'Getting your location…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        latInput.value = pos.coords.latitude;
+        lonInput.value = pos.coords.longitude;
+        villageSelect.value = '';
+        status.textContent = 'Location captured.';
+      },
+      () => { status.textContent = 'Could not get your location — pick a village instead.'; }
+    );
+  });
+
+  document.getElementById('report-form').addEventListener('submit', (e) => {
+    if (!latInput.value || !lonInput.value) {
+      e.preventDefault();
+      alert('Please pick a village or use your current location first.');
+    }
+  });
+</script>
+{% endblock %}

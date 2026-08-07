@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Map — Somfound{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+{% block content %}
+<section class="map-page">
+  <div class="filters">
+    <label>Category
+      <select id="filter-category">
+        <option value="">All</option>
+        {% for value, label in categories %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Urgency
+      <select id="filter-urgency">
+        <option value="">All</option>
+        {% for u in urgencies %}
+        <option value="{{ u }}">{{ u|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Since
+      <select id="filter-since">
+        <option value="">All time</option>
+        <option value="1">Last 24 hours</option>
+        <option value="7" selected>Last 7 days</option>
+        <option value="30">Last 30 days</option>
+      </select>
+    </label>
+  </div>
+  <div id="map"></div>
+  <p class="hint">Colors show urgency (red = critical → blue = informational). Icons show category. Tap a point for details. Reports here have already passed moderator review.</p>
+</section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map').setView([6.13, 6.80], 12); // centered on the pilot village cluster
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(map);
+
+  let markers = L.layerGroup().addTo(map);
+
+  function buildQuery() {
+    const params = new URLSearchParams();
+    const category = document.getElementById('filter-category').value;
+    const urgency = document.getElementById('filter-urgency').value;
+    const since = document.getElementById('filter-since').value;
+    if (category) params.set('category', category);
+    if (urgency) params.set('urgency', urgency);
+    if (since) params.set('since_days', since);
+    return params.toString();
+  }
+
+  async function loadReports() {
+    const res = await fetch('/api/reports?' + buildQuery());
+    const reports = await res.json();
+    markers.clearLayers();
+    reports.forEach((r) => {
+      const icon = L.divIcon({
+        html: `<span class="pin" style="background:${r.color}">${r.icon}</span>`,
+        className: '',
+        iconSize: [28, 28],
+      });
+      const marker = L.marker([r.lat, r.lon], { icon });
+      marker.bindPopup(
+        `<strong>${r.category_label}</strong> · ${r.urgency}<br>` +
+        `${r.description}<br>` +
+        `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>`
+      );
+      markers.addLayer(marker);
+    });
+  }
+
+  ['filter-category', 'filter-urgency', 'filter-since'].forEach((id) =>
+    document.getElementById(id).addEventListener('change', loadReports)
+  );
+  loadReports();
+</script>
+{% endblock %}
