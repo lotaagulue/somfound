@@ -106,6 +106,61 @@ class Report(SQLModel, table=True):
     resolved_at: datetime | None = None
 
 
+class ResourceType(StrEnum):
+    FIRST_AID_KIT = "first_aid_kit"
+    # Room to grow — the business plan's other Q1 priority is first-aid kit
+    # boxes specifically, but the shape (a moderator-managed physical
+    # resource at an LGA location, with an install/condition status) applies
+    # to future resource types too, not just this one.
+
+
+class ResourceStatus(StrEnum):
+    PLANNED = "planned"
+    INSTALLED = "installed"
+    NEEDS_RESTOCK = "needs_restock"
+    DAMAGED = "damaged"
+
+
+RESOURCE_TYPE_LABELS: dict[ResourceType, str] = {
+    ResourceType.FIRST_AID_KIT: "First-Aid Kit Box",
+}
+RESOURCE_TYPE_ICONS: dict[ResourceType, str] = {
+    ResourceType.FIRST_AID_KIT: "\U0001FA79",  # adhesive bandage
+}
+RESOURCE_STATUS_LABELS: dict[ResourceStatus, str] = {
+    ResourceStatus.PLANNED: "Planned",
+    ResourceStatus.INSTALLED: "Installed",
+    ResourceStatus.NEEDS_RESTOCK: "Needs restock",
+    ResourceStatus.DAMAGED: "Damaged",
+}
+# Reuses the same validated status-palette family as URGENCY_COLORS (see the
+# comment above it) rather than inventing a new ramp — installed reads as
+# "good" the same way informational urgency does.
+RESOURCE_STATUS_COLORS: dict[ResourceStatus, str] = {
+    ResourceStatus.PLANNED: "#9ca3af",
+    ResourceStatus.INSTALLED: "#0ca30c",
+    ResourceStatus.NEEDS_RESTOCK: "#fab219",
+    ResourceStatus.DAMAGED: "#d03b3b",
+}
+
+
+class Resource(SQLModel, table=True):
+    """A physical community resource the org installs and tracks — first-aid
+    kit boxes today, per the business plan's other Q1 priority alongside the
+    crime hotline. Moderator-managed only: unlike Report, there's no public
+    submission path — installation is the org's own team's job."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    resource_type: ResourceType
+    status: ResourceStatus = ResourceStatus.PLANNED
+    lga_id: int | None = Field(default=None, foreign_key="lga.id")
+    lat: float
+    lon: float
+    notes: str = ""
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
 class SmsInbound(SQLModel, table=True):
     """Raw audit log of every inbound SMS, independent of whether parsing succeeded."""
 

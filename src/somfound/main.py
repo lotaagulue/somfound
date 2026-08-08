@@ -6,7 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from somfound.db import engine, init_db
 from somfound.paths import STATIC_DIR
-from somfound.routers import api, moderation, pages, sms
+from somfound.routers import api, moderation, pages, resources, sms
 from somfound.seed import seed_demo_reports, seed_lgas
 
 
@@ -26,6 +26,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(pages.router)
 app.include_router(moderation.router)
+app.include_router(resources.router)
 app.include_router(api.router)
 app.include_router(sms.router)
 

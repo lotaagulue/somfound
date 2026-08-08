@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Resources — Somfound{% endblock %}
+{% block content %}
+<section class="moderate-page">
+  <h1>First-aid kit locations</h1>
+  <p class="hint">Moderator-managed — installation is the org's own team's job, not something reported by villagers. Shown as a toggle-able layer on the public map.</p>
+
+  <div class="form-page">
+  <form method="post" action="/resources">
+    <label>Type
+      <select name="resource_type" required>
+        {% for value, label in resource_types %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Status
+      <select name="status">
+        {% for value, label in statuses %}
+        <option value="{{ value }}" {% if value == 'installed' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>LGA
+      <select id="lga-select" name="lga_id">
+        <option value="">— pick an LGA —</option>
+        {% for lga in lgas %}
+        <option value="{{ lga.id }}" data-lat="{{ lga.lat }}" data-lon="{{ lga.lon }}">{{ lga.state }} — {{ lga.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Lat <input type="number" step="any" name="lat" id="lat" required></label>
+    <label>Lon <input type="number" step="any" name="lon" id="lon" required></label>
+    <label>Notes <input type="text" name="notes" placeholder="e.g. installed at the community square meeting hall"></label>
+    <button type="submit">Add resource</button>
+  </form>
+  </div>
+
+  <h2>Existing ({{ resources|length }})</h2>
+  {% for r in resources %}
+  <article class="report-card">
+    <header>
+      <strong>{{ type_labels[r.resource_type] }}</strong> · {{ status_labels[r.status] }}
+      <span class="timestamp">{{ r.updated_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+    </header>
+    <p>{{ r.notes or "No notes." }}</p>
+    <p class="hint">Coordinates: {{ "%.4f"|format(r.lat) }}, {{ "%.4f"|format(r.lon) }}</p>
+    <form method="post" action="/resources/{{ r.id }}/status" class="inline-form">
+      <select name="status">
+        {% for value, label in statuses %}
+        <option value="{{ value }}" {% if value == r.status.value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="notes" placeholder="Update notes (optional)">
+      <button type="submit">Update</button>
+    </form>
+  </article>
+  {% endfor %}
+</section>
+
+<script>
+  const lgaSelect = document.getElementById('lga-select');
+  lgaSelect.addEventListener('change', () => {
+    const opt = lgaSelect.selectedOptions[0];
+    if (opt && opt.dataset.lat) {
+      document.getElementById('lat').value = opt.dataset.lat;
+      document.getElementById('lon').value = opt.dataset.lon;
+    }
+  });
+</script>
+{% endblock %}
