@@ -52,6 +52,10 @@ webhook — under `src/somfound/`:
   new inbound-SMS behavior here, not duplicated across the two callers.
 - **`crud.py`** — the only place that touches the DB for reads/writes report data; hashes
   reporter phone numbers (`hash_reporter_contact`) so raw numbers are never persisted.
+  `list_published_reports()` excludes `RESOLVED` by default (`include_resolved=True` to opt
+  in) — this used to silently include resolved reports alongside published ones with no visual
+  distinction, defeating the entire point of "Resolved," until a user caught it in production.
+
 - **`routers/`** — `pages.py` (public map + report form), `moderation.py` (queue, HTTP Basic
   auth via `auth.py`), `api.py` (JSON feed the map's JS polls), `sms.py` (both the real
   webhook and `/sms/simulate`, both backed by `sms_service.py`).

@@ -33,6 +33,10 @@
         <option value="30">Last 30 days</option>
       </select>
     </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="filter-resolved">
+      Show resolved (greyed out, hidden by default)
+    </label>
   </div>
 
   <div id="map"></div>
@@ -68,9 +72,11 @@
     const category = document.getElementById('filter-category').value;
     const urgency = document.getElementById('filter-urgency').value;
     const since = document.getElementById('filter-since').value;
+    const includeResolved = document.getElementById('filter-resolved').checked;
     if (category) params.set('category', category);
     if (urgency) params.set('urgency', urgency);
     if (since) params.set('since_days', since);
+    if (includeResolved) params.set('include_resolved', 'true');
     return params.toString();
   }
 
@@ -79,14 +85,15 @@
     const reports = await res.json();
     markers.clearLayers();
     reports.forEach((r) => {
+      const resolved = r.status === 'resolved';
       const icon = L.divIcon({
-        html: `<span class="pin" style="background:${r.color}">${r.icon}</span>`,
+        html: `<span class="pin${resolved ? ' pin-resolved' : ''}" style="background:${r.color}">${r.icon}</span>`,
         className: '',
         iconSize: [28, 28],
       });
       const marker = L.marker([r.lat, r.lon], { icon });
       marker.bindPopup(
-        `<strong>${r.category_label}</strong> · ${r.urgency_label}<br>` +
+        `<strong>${r.category_label}</strong> · ${resolved ? 'Resolved' : r.urgency_label}<br>` +
         `${r.description}<br>` +
         `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>`
       );
@@ -94,7 +101,7 @@
     });
   }
 
-  ['filter-category', 'filter-urgency', 'filter-since'].forEach((id) =>
+  ['filter-category', 'filter-urgency', 'filter-since', 'filter-resolved'].forEach((id) =>
     document.getElementById(id).addEventListener('change', loadReports)
   );
   loadReports();
