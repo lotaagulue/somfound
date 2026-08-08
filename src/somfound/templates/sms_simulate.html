@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Simulate SMS — Somfound{% endblock %}
+{% block content %}
+<section class="form-page">
+  <h1>Simulate an SMS report</h1>
+  <p class="hint">
+    No smartphone, no telco account, nothing to configure — this drives the exact same
+    parsing and moderation pipeline a real SMS would, so you can see how it works without
+    an SMS gateway. (A real deployment would wire <code>/sms/inbound</code> up to an actual
+    SMS provider later — see README.)
+  </p>
+
+  {% if outcome %}
+  <div class="banner {% if outcome.rate_limited %}banner-warning{% else %}banner-success{% endif %}">
+    {% if outcome.rate_limited %}
+      Rate-limited: this simulated phone number already has several reports pending review.
+    {% else %}
+      Parsed as <strong>{{ outcome.category_label }}</strong> · <strong>{{ outcome.urgency_label }}</strong>
+      {% if outcome.village_name %} · matched village: <strong>{{ outcome.village_name }}</strong>{% endif %}
+      {% if not outcome.keyword_matched %} · no keyword recognized, filed under "Other" for a moderator to reclassify{% endif %}
+    {% endif %}
+    <br>
+    <span class="hint">Simulated reply SMS: "{{ outcome.reply }}"</span>
+  </div>
+  {% if outcome.report_id %}
+  <p class="hint">Created as report #{{ outcome.report_id }}, status <strong>pending</strong> — <a href="/moderate">view it in the moderator queue</a>.</p>
+  {% endif %}
+  {% endif %}
+
+  <form method="post" action="/sms/simulate">
+    <label>Phone number <span class="optional">(fake — just distinguishes senders for the rate limit)</span>
+      <input type="text" name="phone" value="{{ submitted_phone or '+2348012345678' }}">
+    </label>
+    <label>SMS text
+      <textarea name="text" rows="3" required placeholder="WATER Umuoji borehole broken 3 days no fix">{{ submitted_text or '' }}</textarea>
+    </label>
+    <p class="hint">
+      Try: <code>WATER Umuoji borehole broken 3 days no fix</code>,
+      <code>CRIME urgent armed men seen near Nkpor market now</code>,
+      <code>SCHOOL new block opened in Ogidi</code>
+    </p>
+    <button type="submit">Send simulated SMS</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,8 +1,8 @@
-"""Optional outbound SMS via Africa's Talking (sandbox by default, free).
-
-Sending a confirmation reply is a nice-to-have, not required for the demo to
-work: if no API key is configured, or the call fails, we just log it and
-move on rather than failing the inbound webhook.
+"""Optional outbound SMS via Africa's Talking — for a real deployment only.
+The demo doesn't need this at all (see /sms/simulate); it exists so a real
+pilot can wire up actual confirmation replies later with production
+credentials. If no API key is configured, or the call fails, we just log it
+and move on rather than failing the inbound webhook.
 """
 
 import logging
