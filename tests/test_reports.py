@@ -1,3 +1,6 @@
+from somfound import crud
+
+
 def test_moderation_queue_requires_auth(client):
     response = client.get("/moderate")
     assert response.status_code == 401
@@ -91,12 +94,12 @@ def test_sms_inbound_creates_categorized_pending_report(client, moderator_auth):
 
 
 def test_sms_rate_limit_stops_after_threshold(client):
-    for i in range(4):
+    for i in range(crud.MAX_PENDING_PER_REPORTER):
         client.post("/sms/inbound", data={"from": "+2348000000002", "text": f"HELP spam attempt {i}"})
 
-    # The 4th (index 3) should have been rate-limited: no new report created.
-    fourth = client.post("/sms/inbound", data={"from": "+2348000000002", "text": "HELP spam attempt 4"})
-    assert fourth.json()["report_id"] is None
+    # One past the threshold should be rate-limited: no new report created.
+    blocked = client.post("/sms/inbound", data={"from": "+2348000000002", "text": "HELP spam attempt blocked"})
+    assert blocked.json()["report_id"] is None
 
 
 def _report_payload(description: str, **overrides) -> dict:
@@ -128,11 +131,12 @@ def test_web_report_rate_limit_stops_anonymous_spam(client, moderator_auth):
     # No phone given on any of these — all share the same fallback rate-limit
     # key (a hash of the test client's IP), same as one anonymous spammer.
     # Left pending (not approved) until the end of the test — the whole
-    # point is proving 3 *simultaneously* pending reports block a 4th.
+    # point is proving MAX_PENDING_PER_REPORTER *simultaneously* pending
+    # reports block the next one.
     created_ids = []
-    for i in range(3):
+    for i in range(crud.MAX_PENDING_PER_REPORTER):
         r = client.post("/report", data=_report_payload(f"anon spam marker {i}"))
-        assert "reward wallet code" in r.text  # each of the first 3 succeeds
+        assert "reward wallet code" in r.text  # each of these succeeds
         created_ids.append(_approve_and_get_id(client, moderator_auth))
 
     fourth = client.post("/report", data=_report_payload("anon spam marker blocked"))
@@ -155,7 +159,7 @@ def test_web_report_rate_limit_is_independent_per_phone(client, moderator_auth):
     # Exhaust the anonymous (no-phone) bucket first — again left pending
     # until cleanup at the end, for the same reason as above.
     created_ids = []
-    for i in range(3):
+    for i in range(crud.MAX_PENDING_PER_REPORTER):
         r = client.post("/report", data=_report_payload(f"anon bucket filler {i}"))
         assert "reward wallet code" in r.text
         created_ids.append(_approve_and_get_id(client, moderator_auth))

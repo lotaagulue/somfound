@@ -33,8 +33,11 @@ _WALLET_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 # anonymous web submissions — see Report.reporter_ref) has this many reports
 # still sitting in PENDING, further submissions are blocked until a
 # moderator clears some of the backlog. Self-resets as the queue is worked,
-# not a hard ban.
-MAX_PENDING_PER_REPORTER = 3
+# not a hard ban. Started at 3, which turned out too tight even for normal
+# real usage (one person legitimately has several distinct things to report
+# before a moderator gets to any of them) — 10 still meaningfully bounds an
+# automated spammer while giving real reporters/testers actual headroom.
+MAX_PENDING_PER_REPORTER = 10
 
 
 def hash_reporter_contact(raw: str) -> str:
