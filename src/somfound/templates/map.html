@@ -37,6 +37,10 @@
       <input type="checkbox" id="filter-resolved">
       Show resolved (greyed out, hidden by default)
     </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="filter-kits" checked>
+      Show first-aid kit locations
+    </label>
   </div>
 
   <div id="map"></div>
@@ -54,6 +58,10 @@
       <span class="legend-item">{{ item.icon }} {{ item.label }}</span>
       {% endfor %}
     </div>
+    <div class="legend-group">
+      <span class="legend-group-title">Resources</span>
+      <span class="legend-item">🩹 First-aid kit box (color = install status)</span>
+    </div>
   </div>
 </section>
 
@@ -66,6 +74,7 @@
   }).addTo(map);
 
   let markers = L.layerGroup().addTo(map);
+  let kitMarkers = L.layerGroup().addTo(map);
 
   function buildQuery() {
     const params = new URLSearchParams();
@@ -101,9 +110,36 @@
     });
   }
 
+  async function loadResources() {
+    const res = await fetch('/api/resources');
+    const resources = await res.json();
+    kitMarkers.clearLayers();
+    resources.forEach((r) => {
+      const icon = L.divIcon({
+        html: `<span class="pin" style="background:${r.color}">${r.icon}</span>`,
+        className: '',
+        iconSize: [28, 28],
+      });
+      const marker = L.marker([r.lat, r.lon], { icon });
+      marker.bindPopup(
+        `<strong>${r.type_label}</strong> · ${r.status_label}<br>` +
+        `${r.notes || ''}`
+      );
+      kitMarkers.addLayer(marker);
+    });
+  }
+
   ['filter-category', 'filter-urgency', 'filter-since', 'filter-resolved'].forEach((id) =>
     document.getElementById(id).addEventListener('change', loadReports)
   );
+  document.getElementById('filter-kits').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      map.addLayer(kitMarkers);
+    } else {
+      map.removeLayer(kitMarkers);
+    }
+  });
   loadReports();
+  loadResources();
 </script>
 {% endblock %}

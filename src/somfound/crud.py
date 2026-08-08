@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from somfound.models import LGA, Category, Report, SourceChannel, Status, Urgency
+from somfound.models import LGA, Category, Report, Resource, ResourceStatus, ResourceType, SourceChannel, Status, Urgency
 
 
 def hash_reporter_contact(raw: str) -> str:
@@ -48,6 +48,49 @@ def create_report(
     session.commit()
     session.refresh(report)
     return report
+
+
+# --- Resources (first-aid kit boxes, etc.) — moderator-managed, no public submission ---
+
+
+def list_resources(session: Session) -> list[Resource]:
+    return list(session.exec(select(Resource).order_by(Resource.created_at.desc())).all())
+
+
+def create_resource(
+    session: Session,
+    *,
+    resource_type: ResourceType,
+    status: ResourceStatus,
+    lga_id: int | None,
+    lat: float,
+    lon: float,
+    notes: str = "",
+) -> Resource:
+    resource = Resource(
+        resource_type=resource_type, status=status, lga_id=lga_id, lat=lat, lon=lon, notes=notes
+    )
+    session.add(resource)
+    session.commit()
+    session.refresh(resource)
+    return resource
+
+
+def get_resource(session: Session, resource_id: int) -> Resource | None:
+    return session.get(Resource, resource_id)
+
+
+def update_resource_status(
+    session: Session, resource: Resource, *, status: ResourceStatus, notes: str = ""
+) -> Resource:
+    resource.status = status
+    if notes:
+        resource.notes = notes
+    resource.updated_at = datetime.now(timezone.utc)
+    session.add(resource)
+    session.commit()
+    session.refresh(resource)
+    return resource
 
 
 def list_published_reports(
