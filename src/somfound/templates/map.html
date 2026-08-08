@@ -48,6 +48,7 @@
     </label>
   </div>
 
+  <p id="map-status" class="hint">Loading reports…</p>
   <div id="map"></div>
 
   <div class="legend">
@@ -81,6 +82,29 @@
   let markers = L.layerGroup().addTo(map);
   let kitMarkers = L.layerGroup(); // off by default — toggled on via the checkbox below
 
+  const mapStatus = document.getElementById('map-status');
+
+  // Rural/mobile connections here are often slow or flaky — never let a
+  // failed fetch just leave the map silently empty with no explanation.
+  function setMapStatus(message, isError) {
+    if (!message) {
+      mapStatus.style.display = 'none';
+      return;
+    }
+    mapStatus.className = isError ? 'banner banner-warning' : 'hint';
+    mapStatus.textContent = message;
+    mapStatus.style.display = 'block';
+    if (isError) {
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn-small';
+      retry.textContent = 'Retry';
+      retry.onclick = () => { loadReports(); loadResources(); };
+      mapStatus.appendChild(document.createTextNode(' '));
+      mapStatus.appendChild(retry);
+    }
+  }
+
   function buildQuery() {
     const params = new URLSearchParams();
     const category = document.getElementById('filter-category').value;
@@ -95,38 +119,49 @@
   }
 
   async function loadReports() {
-    const res = await fetch('/api/reports?' + buildQuery());
-    const reports = await res.json();
-    markers.clearLayers();
-    reports.forEach((r) => {
-      const resolved = r.status === 'resolved';
-      const icon = L.divIcon({
-        html: `<span class="pin${resolved ? ' pin-resolved' : ''}" style="background:${r.color}">${r.icon}</span>`,
-        className: '',
-        iconSize: [28, 28],
+    setMapStatus('Loading reports…', false);
+    try {
+      const res = await fetch('/api/reports?' + buildQuery());
+      if (!res.ok) throw new Error(`bad response: ${res.status}`);
+      const reports = await res.json();
+      setMapStatus('', false);
+      markers.clearLayers();
+      reports.forEach((r) => {
+        const resolved = r.status === 'resolved';
+        const icon = L.divIcon({
+          html: `<span class="pin${resolved ? ' pin-resolved' : ''}" style="background:${r.color}">${r.icon}</span>`,
+          className: '',
+          iconSize: [28, 28],
+        });
+        const marker = L.marker([r.lat, r.lon], { icon });
+        const confirmLabel = r.confirmations_count > 0
+          ? `Confirm — ${r.confirmations_count} neighbor${r.confirmations_count === 1 ? '' : 's'} already have`
+          : 'Confirm this is happening';
+        const confirmButton = resolved
+          ? ''
+          : `<br><button class="confirm-btn" onclick="confirmReport(${r.id}, this)">${confirmLabel}</button>`;
+        marker.bindPopup(
+          `<strong>${r.category_label}</strong> · ${resolved ? 'Resolved' : r.urgency_label}<br>` +
+          `${r.description}<br>` +
+          `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>` +
+          confirmButton
+        );
+        markers.addLayer(marker);
       });
-      const marker = L.marker([r.lat, r.lon], { icon });
-      const confirmButton = resolved
-        ? ''
-        : `<br><button class="confirm-btn" onclick="confirmReport(${r.id}, this)">Confirm (${r.confirmations_count})</button>`;
-      marker.bindPopup(
-        `<strong>${r.category_label}</strong> · ${resolved ? 'Resolved' : r.urgency_label}<br>` +
-        `${r.description}<br>` +
-        `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>` +
-        confirmButton
-      );
-      markers.addLayer(marker);
-    });
+    } catch (e) {
+      setMapStatus("Couldn't load reports — check your connection.", true);
+    }
   }
 
   window.confirmReport = async function (id, btn) {
     btn.disabled = true;
     try {
       const res = await fetch(`/api/reports/${id}/confirm`, { method: 'POST' });
+      if (!res.ok) throw new Error(`bad response: ${res.status}`);
       const data = await res.json();
       btn.textContent = data.already_confirmed
-        ? `You already confirmed this (${data.confirmations_count})`
-        : `Confirmed ✓ (${data.confirmations_count})`;
+        ? `You've already confirmed this (${data.confirmations_count})`
+        : `Thanks — confirmed ✓ (${data.confirmations_count})`;
     } catch (e) {
       btn.disabled = false;
       btn.textContent = 'Confirm — try again';
@@ -134,22 +169,30 @@
   };
 
   async function loadResources() {
-    const res = await fetch('/api/resources');
-    const resources = await res.json();
-    kitMarkers.clearLayers();
-    resources.forEach((r) => {
-      const icon = L.divIcon({
-        html: `<span class="pin" style="background:${r.color}">${r.icon}</span>`,
-        className: '',
-        iconSize: [28, 28],
+    try {
+      const res = await fetch('/api/resources');
+      if (!res.ok) throw new Error(`bad response: ${res.status}`);
+      const resources = await res.json();
+      kitMarkers.clearLayers();
+      resources.forEach((r) => {
+        const icon = L.divIcon({
+          html: `<span class="pin" style="background:${r.color}">${r.icon}</span>`,
+          className: '',
+          iconSize: [28, 28],
+        });
+        const marker = L.marker([r.lat, r.lon], { icon });
+        marker.bindPopup(
+          `<strong>${r.type_label}</strong> · ${r.status_label}<br>` +
+          `${r.notes || ''}`
+        );
+        kitMarkers.addLayer(marker);
       });
-      const marker = L.marker([r.lat, r.lon], { icon });
-      marker.bindPopup(
-        `<strong>${r.type_label}</strong> · ${r.status_label}<br>` +
-        `${r.notes || ''}`
-      );
-      kitMarkers.addLayer(marker);
-    });
+    } catch (e) {
+      // Kit locations are a secondary, off-by-default layer — don't stomp on
+      // a reports-load error banner with a second one; just leave the layer
+      // empty and let the user retry via the main status banner if needed.
+      console.warn('Failed to load kit locations', e);
+    }
   }
 
   ['filter-category', 'filter-urgency', 'filter-since', 'filter-resolved'].forEach((id) =>
