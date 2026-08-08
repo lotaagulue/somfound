@@ -1,4 +1,6 @@
 from somfound import crud
+from somfound.models import Category, Urgency
+from somfound.routers import pages
 
 
 def test_moderation_queue_requires_auth(client):
@@ -293,3 +295,65 @@ def test_wallet_recovery_tip_shown_only_when_no_phone_was_given(client, moderato
 
     for _ in range(2):
         _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+# --- LLM fallback wiring (routers/pages.py) — see tests/test_llm_classifier.py
+# for the classifier's own unit tests; these check it's actually *called* at
+# the right time (and not called at the wrong time), with the network call
+# itself mocked out so no real API key/network access is needed.
+
+
+def test_llm_fallback_used_when_no_keyword_matches(client, moderator_auth, monkeypatch):
+    monkeypatch.setattr(
+        pages, "guess_category_urgency_with_llm", lambda description: (Category.CRIME_SAFETY, Urgency.CRITICAL)
+    )
+
+    response = client.post(
+        "/report",
+        data=_report_payload(
+            "Something strange is going on that I cannot quite describe llm-fallback-marker",
+            category="",
+            urgency="",
+        ),
+    )
+    assert response.status_code == 200
+    assert "using AI" in response.text
+    assert "Crime &amp; Safety" in response.text or "Crime & Safety" in response.text
+    assert "Critical" in response.text
+
+    _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+def test_llm_fallback_not_called_when_a_keyword_already_matches(client, moderator_auth, monkeypatch):
+    def _should_not_be_called(description):
+        raise AssertionError("LLM fallback should not run when a keyword already matched")
+
+    monkeypatch.setattr(pages, "guess_category_urgency_with_llm", _should_not_be_called)
+
+    response = client.post(
+        "/report",
+        data=_report_payload("CRIME reported near the junction llm-not-called-marker", category="", urgency=""),
+    )
+    assert response.status_code == 200
+    assert "using AI" not in response.text
+
+    _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+def test_llm_fallback_not_called_when_category_or_urgency_set_explicitly(client, moderator_auth, monkeypatch):
+    def _should_not_be_called(description):
+        raise AssertionError("LLM fallback should not run when the reporter set a field themselves")
+
+    monkeypatch.setattr(pages, "guess_category_urgency_with_llm", _should_not_be_called)
+
+    response = client.post(
+        "/report",
+        data=_report_payload(
+            "Something strange is going on llm-explicit-override-marker",
+            category="other",
+            urgency="",
+        ),
+    )
+    assert response.status_code == 200
+
+    _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))

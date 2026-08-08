@@ -16,3 +16,10 @@ MODERATOR_PASSWORD = os.environ.get("MODERATOR_PASSWORD", "somfound-demo")
 AT_USERNAME = os.environ.get("AT_USERNAME", "")
 AT_API_KEY = os.environ.get("AT_API_KEY", "")
 AT_BASE_URL = os.environ.get("AT_BASE_URL", "https://api.africastalking.com")
+
+# Gemini (LLM fallback for web-report category/urgency classification) — see
+# llm_classifier.py. Optional: leave unset and the keyword-only guess
+# (sms_parser.guess_category_urgency) is all that runs, same as before this
+# existed. Free-tier key, so this is safe to enable for the demo.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")

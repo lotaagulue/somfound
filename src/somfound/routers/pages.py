@@ -19,6 +19,7 @@ from somfound.models import (
     Urgency,
     Wallet,
 )
+from somfound.llm_classifier import guess_category_urgency_with_llm
 from somfound.paths import TEMPLATES_DIR
 from somfound.seed import STATES
 from somfound.sms_parser import guess_category_urgency
@@ -83,6 +84,7 @@ def _report_form_context(session: Session, **extra) -> dict:
         "description_too_long": False,
         "max_description_length": MAX_DESCRIPTION_LENGTH,
         "auto_categorized": False,
+        "used_llm": False,
         "detected_category_label": "",
         "detected_urgency_label": "",
         "submission_token": "",
@@ -141,6 +143,21 @@ def submit_report(
             request, "report_form.html", _report_form_context(session, description_too_long=True)
         )
 
+    # Unlike SMS (always has a phone), the web form's phone field is
+    # optional, so there's nothing to rate-limit against for an anonymous
+    # submission unless we fall back to something else — a hash of the
+    # client IP. Same shared threshold/query as SMS (crud.MAX_PENDING_PER_REPORTER),
+    # so it self-resets as moderators clear the queue rather than being a
+    # hard ban. Tradeoff worth knowing: reporters behind the same shared/NAT
+    # IP (e.g. one community's only internet gateway) share this bucket.
+    # Checked before categorization below so a rate-limited request doesn't
+    # waste an LLM call.
+    reporter_ref = crud.hash_reporter_contact(phone) or crud.hash_reporter_contact(_client_ip(request))
+    if crud.count_pending_reports(session, reporter_ref) >= crud.MAX_PENDING_PER_REPORTER:
+        return templates.TemplateResponse(
+            request, "report_form.html", _report_form_context(session, rate_limited=True)
+        )
+
     # Category/urgency are optional on the form — most reporters just
     # describe what's happening and we guess, the same keyword-matching
     # engine SMS uses but scanning the whole sentence instead of only a
@@ -148,7 +165,19 @@ def submit_report(
     # expands the "set it yourself" disclosure and picks an explicit value
     # overrides the guess for that field only — a moderator still reviews
     # every report before it's public either way.
-    guessed_category, guessed_urgency, _ = guess_category_urgency(description)
+    guessed_category, guessed_urgency, keyword_matched = guess_category_urgency(description)
+    used_llm = False
+    # The LLM fallback only makes sense when there's nothing else to go
+    # on: no keyword hit, and the reporter didn't set either field
+    # themselves. It's explicitly a fallback for the cases keywords miss,
+    # not a second opinion on cases they already handle — keeps this optional,
+    # free-tier-quota-friendly integration limited to where it actually adds
+    # value.
+    if not category and not urgency and not keyword_matched:
+        llm_result = guess_category_urgency_with_llm(description)
+        if llm_result is not None:
+            guessed_category, guessed_urgency = llm_result
+            used_llm = True
     try:
         final_category = Category(category) if category else guessed_category
     except ValueError:
@@ -158,19 +187,6 @@ def submit_report(
     except ValueError:
         final_urgency = guessed_urgency
     auto_categorized = not category or not urgency
-
-    # Unlike SMS (always has a phone), the web form's phone field is
-    # optional, so there's nothing to rate-limit against for an anonymous
-    # submission unless we fall back to something else — a hash of the
-    # client IP. Same shared threshold/query as SMS (crud.MAX_PENDING_PER_REPORTER),
-    # so it self-resets as moderators clear the queue rather than being a
-    # hard ban. Tradeoff worth knowing: reporters behind the same shared/NAT
-    # IP (e.g. one community's only internet gateway) share this bucket.
-    reporter_ref = crud.hash_reporter_contact(phone) or crud.hash_reporter_contact(_client_ip(request))
-    if crud.count_pending_reports(session, reporter_ref) >= crud.MAX_PENDING_PER_REPORTER:
-        return templates.TemplateResponse(
-            request, "report_form.html", _report_form_context(session, rate_limited=True)
-        )
 
     # Every report gets a wallet — see crud.resolve_wallet_for_report for the
     # three-way logic (explicit code > phone-linked > brand new anonymous
@@ -201,6 +217,7 @@ def submit_report(
             wallet_code=wallet.wallet_code,
             gave_phone=bool(wallet.phone_hash),
             auto_categorized=auto_categorized,
+            used_llm=used_llm,
             detected_category_label=CATEGORY_LABELS[final_category],
             detected_urgency_label=URGENCY_LABELS[final_urgency],
             # Echoed back into the hidden field: if THIS response is what

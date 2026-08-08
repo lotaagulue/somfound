@@ -8,7 +8,8 @@
     Thanks — your report was submitted and is waiting for moderator review before it appears on the map.
     {% if auto_categorized %}
     <br>We categorized this as <strong>{{ detected_category_label }}</strong> · <strong>{{ detected_urgency_label }}</strong> urgency
-    based on your description — a moderator will double-check before it's published.
+    based on your description{% if used_llm %} (using AI, since we couldn't find a clear keyword match){% endif %}
+    — a moderator will double-check before it's published.
     {% endif %}
     <br>Your reward wallet code: <strong>{{ wallet_code }}</strong> — save this. Verified reports (especially
     crime/safety tips) can earn points here, redeemable for airtime or a gift card at
