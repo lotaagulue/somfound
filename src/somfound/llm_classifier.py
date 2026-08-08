@@ -146,6 +146,38 @@ def _parse(raw: str, provider_name: str) -> tuple[Category, Urgency] | None:
         return None
 
 
+def _friendly_model_name(model_id: str) -> str:
+    """'gemini-3.5-flash' -> 'Gemini 3.5 Flash', 'mistral-small-latest' ->
+    'Mistral Small' — for the report form's user-facing note about which AI
+    can help categorize a report. No hardcoded name-to-name mapping to keep
+    up to date: this degrades gracefully (still readable, just less pretty)
+    if GEMINI_MODEL/MISTRAL_MODEL ever point at a model name shaped
+    differently than today's."""
+    parts = model_id.split("-")
+    if parts and parts[-1].lower() == "latest":
+        parts = parts[:-1]
+    return " ".join(p if any(ch.isdigit() for ch in p) else p.capitalize() for p in parts)
+
+
+def describe_configured_providers() -> str:
+    """A short, honest, user-facing note for the report form about which AI
+    model(s) can help categorize a report — empty string if neither
+    provider is configured, so "dormant" means truly invisible, not just
+    unused. Mirrors the real fallback order (Gemini first, Mistral only as
+    backup), not two providers working in parallel."""
+    names = []
+    if GEMINI_API_KEY:
+        names.append(_friendly_model_name(GEMINI_MODEL))
+    if MISTRAL_API_KEY:
+        names.append(_friendly_model_name(MISTRAL_MODEL))
+
+    if not names:
+        return ""
+    if len(names) == 1:
+        return f"Category/urgency can get AI help from {names[0]} when no keyword matches."
+    return f"Category/urgency can get AI help from {names[0]} (backed up by {names[1]}) when no keyword matches."
+
+
 def guess_category_urgency_with_llm(description: str) -> tuple[Category, Urgency] | None:
     """None means "couldn't classify" for any reason — always safe for the
     caller to fall back to the keyword default. Tries Gemini first, then

@@ -125,3 +125,35 @@ def test_returns_none_on_invalid_enum_value(monkeypatch):
 def test_prompt_mentions_the_report_text():
     prompt = llm_classifier._build_prompt("a very specific marker phrase")
     assert "a very specific marker phrase" in prompt
+
+
+# --- describe_configured_providers (the report form's "we use AI" note) ---
+
+
+def test_friendly_model_name_formats_version_and_strips_latest():
+    assert llm_classifier._friendly_model_name("gemini-3.5-flash") == "Gemini 3.5 Flash"
+    assert llm_classifier._friendly_model_name("mistral-small-latest") == "Mistral Small"
+
+
+def test_describe_configured_providers_empty_when_neither_configured():
+    assert llm_classifier.describe_configured_providers() == ""
+
+
+def test_describe_configured_providers_mentions_gemini_only(monkeypatch):
+    monkeypatch.setattr(llm_classifier, "GEMINI_API_KEY", "fake-key")
+    monkeypatch.setattr(llm_classifier, "GEMINI_MODEL", "gemini-3.5-flash")
+
+    note = llm_classifier.describe_configured_providers()
+    assert "Gemini 3.5 Flash" in note
+    assert "backed up by" not in note
+
+
+def test_describe_configured_providers_mentions_both_in_fallback_order(monkeypatch):
+    monkeypatch.setattr(llm_classifier, "GEMINI_API_KEY", "fake-gemini-key")
+    monkeypatch.setattr(llm_classifier, "GEMINI_MODEL", "gemini-3.5-flash")
+    monkeypatch.setattr(llm_classifier, "MISTRAL_API_KEY", "fake-mistral-key")
+    monkeypatch.setattr(llm_classifier, "MISTRAL_MODEL", "mistral-small-latest")
+
+    note = llm_classifier.describe_configured_providers()
+    assert "Gemini 3.5 Flash" in note
+    assert "backed up by Mistral Small" in note

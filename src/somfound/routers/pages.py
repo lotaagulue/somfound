@@ -19,7 +19,7 @@ from somfound.models import (
     Urgency,
     Wallet,
 )
-from somfound.llm_classifier import guess_category_urgency_with_llm
+from somfound.llm_classifier import describe_configured_providers, guess_category_urgency_with_llm
 from somfound.paths import TEMPLATES_DIR
 from somfound.seed import STATES
 from somfound.sms_parser import guess_category_urgency
@@ -89,6 +89,11 @@ def _report_form_context(session: Session, **extra) -> dict:
         "detected_urgency_label": "",
         "submission_token": "",
         "gave_phone": False,
+        # Computed fresh per request (cheap — no I/O) rather than cached at
+        # import time, so it reflects the current config even under
+        # uvicorn --reload / test monkeypatching. Empty string if neither
+        # provider is configured — nothing renders, not even a placeholder.
+        "ai_assist_note": describe_configured_providers(),
         **extra,
     }
 

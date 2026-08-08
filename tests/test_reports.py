@@ -357,3 +357,19 @@ def test_llm_fallback_not_called_when_category_or_urgency_set_explicitly(client,
     assert response.status_code == 200
 
     _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+# --- report form's "we use AI" note (pages.describe_configured_providers) ---
+
+
+def test_report_form_shows_no_ai_note_by_default(client):
+    # Default test env has neither GEMINI_API_KEY nor MISTRAL_API_KEY set.
+    response = client.get("/report")
+    assert "AI help" not in response.text
+
+
+def test_report_form_shows_ai_note_when_a_provider_is_configured(client, monkeypatch):
+    note = "Category/urgency can get AI help from Test Model when no keyword matches."
+    monkeypatch.setattr(pages, "describe_configured_providers", lambda: note)
+    response = client.get("/report")
+    assert "Test Model" in response.text
