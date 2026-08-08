@@ -30,7 +30,7 @@ In many Nigerian villages, information about local events — a robbery, a burst
 
 1. Anyone (no login) sees a map of the 5-state region, default-centered on the whole area.
 2. Points are colored by **urgency** and shaped/icon'd by **category** (see §3).
-3. Filter by category, urgency, or time range ("last 7 days").
+3. Filter by category, urgency, or time range ("last 7 days"). Resolved reports are hidden by default — that's the point of marking something resolved — with an opt-in toggle to see them anyway, greyed out.
 4. Tap a point for the report detail: description, photo (if any), time, status (published/resolved).
 
 ## 3. Report taxonomy

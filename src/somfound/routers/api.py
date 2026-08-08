@@ -8,9 +8,11 @@ from somfound.db import DATABASE_URL, get_session
 from somfound.models import (
     CATEGORY_ICONS,
     CATEGORY_LABELS,
+    RESOLVED_COLOR,
     URGENCY_COLORS,
     URGENCY_LABELS,
     Category,
+    Status,
     Urgency,
 )
 
@@ -32,10 +34,15 @@ def api_list_reports(
     category: Category | None = None,
     urgency: Urgency | None = None,
     since_days: int | None = None,
+    include_resolved: bool = False,
     session: Session = Depends(get_session),
 ) -> list[dict]:
     reports = crud.list_published_reports(
-        session, category=category, urgency=urgency, since_days=since_days
+        session,
+        category=category,
+        urgency=urgency,
+        since_days=since_days,
+        include_resolved=include_resolved,
     )
     return [
         {
@@ -45,7 +52,10 @@ def api_list_reports(
             "icon": CATEGORY_ICONS[r.category],
             "urgency": r.urgency.value,
             "urgency_label": URGENCY_LABELS[r.urgency],
-            "color": URGENCY_COLORS[r.urgency],
+            # A resolved report is deliberately greyed out regardless of its
+            # original urgency — it shouldn't keep reading as "live" (see
+            # README §4, this is literally what "Resolved" is supposed to do).
+            "color": RESOLVED_COLOR if r.status == Status.RESOLVED else URGENCY_COLORS[r.urgency],
             "status": r.status.value,
             "description": r.description,
             "lat": r.lat,

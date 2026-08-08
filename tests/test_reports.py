@@ -41,6 +41,42 @@ def test_web_report_is_pending_until_approved(client, moderator_auth):
     assert any("automated test suite" in r["description"] for r in public_after)
 
 
+def test_resolved_report_disappears_from_default_map_but_available_via_toggle(client, moderator_auth):
+    import re
+
+    submit = client.post(
+        "/report",
+        data={
+            "category": "infrastructure",
+            "urgency": "critical",
+            "description": "resolved-visibility-marker",
+            "lat": "6.15",
+            "lon": "6.83",
+        },
+        follow_redirects=False,
+    )
+    assert submit.status_code == 303
+
+    queue = client.get("/moderate", auth=moderator_auth)
+    report_id = re.findall(r"/moderate/(\d+)/approve", queue.text)[-1]
+    client.post(f"/moderate/{report_id}/approve", data={"notes": ""}, auth=moderator_auth)
+
+    published = client.get("/api/reports").json()
+    assert any(r["description"] == "resolved-visibility-marker" for r in published)
+
+    client.post(f"/moderate/{report_id}/resolve", auth=moderator_auth)
+
+    # Default view: resolved reports don't keep looking live.
+    default_view = client.get("/api/reports").json()
+    assert not any(r["description"] == "resolved-visibility-marker" for r in default_view)
+
+    # Explicit opt-in: still available, but greyed out rather than urgency-colored.
+    with_resolved = client.get("/api/reports?include_resolved=true").json()
+    match = next(r for r in with_resolved if r["description"] == "resolved-visibility-marker")
+    assert match["status"] == "resolved"
+    assert match["color"] == "#9ca3af"  # RESOLVED_COLOR, not critical's red
+
+
 def test_sms_inbound_creates_categorized_pending_report(client, moderator_auth):
     response = client.post(
         "/sms/inbound", data={"from": "+2348000000001", "text": "WATER Nsukka borehole broken pytest marker"}

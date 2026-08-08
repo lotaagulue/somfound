@@ -73,6 +73,7 @@ URGENCY_COLORS: dict[Urgency, str] = {
     Urgency.INFORMATIONAL: "#0ca30c",
 }
 PENDING_COLOR = "#9ca3af"  # grey, used for anything not yet published
+RESOLVED_COLOR = "#9ca3af"  # same muted grey — a resolved report shouldn't still read as "live"
 
 
 class LGA(SQLModel, table=True):

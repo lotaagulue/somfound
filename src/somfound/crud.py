@@ -56,8 +56,10 @@ def list_published_reports(
     category: Category | None = None,
     urgency: Urgency | None = None,
     since_days: int | None = None,
+    include_resolved: bool = False,
 ) -> list[Report]:
-    statement = select(Report).where(Report.status.in_([Status.PUBLISHED, Status.RESOLVED]))
+    statuses = [Status.PUBLISHED, Status.RESOLVED] if include_resolved else [Status.PUBLISHED]
+    statement = select(Report).where(Report.status.in_(statuses))
     if category:
         statement = statement.where(Report.category == category)
     if urgency:
