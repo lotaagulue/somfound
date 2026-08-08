@@ -351,17 +351,6 @@ code {
 }
 .form-page button:hover, .inline-form button:hover { background: var(--brand-dark); }
 
-.location-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.location-row button {
-  padding: 0.5rem 0.9rem;
-  min-height: 44px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface-alt);
-  color: var(--ink);
-  font-weight: 600;
-  cursor: pointer;
-}
 .optional { font-weight: 400; color: var(--ink-faint); }
 
 .form-disclosure summary {

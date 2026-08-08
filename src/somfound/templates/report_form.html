@@ -59,6 +59,13 @@
       </label>
     </details>
 
+    <!-- The "use my current location" geolocation button was removed here
+         deliberately, not an oversight — for an in-person demo with an
+         audience that isn't physically in Nigeria, it would place pins at
+         the venue's real coordinates instead of anywhere near the map's
+         South-East Nigeria view. State + LGA is the only location input for
+         now; bring geolocation back (see git history for this file) once
+         that's actually useful again. -->
     <label>State
       <select id="state-select">
         <option value="">— pick a state —</option>
@@ -74,10 +81,6 @@
       </select>
     </label>
 
-    <div class="location-row">
-      <button type="button" id="use-location">Use my current location instead</button>
-      <span id="location-status"></span>
-    </div>
     <input type="hidden" name="lat" id="lat">
     <input type="hidden" name="lon" id="lon">
 
@@ -106,7 +109,6 @@
   const lgaSelect = document.getElementById('lga-select');
   const latInput = document.getElementById('lat');
   const lonInput = document.getElementById('lon');
-  const status = document.getElementById('location-status');
 
   stateSelect.addEventListener('change', () => {
     const lgas = LGAS_BY_STATE[stateSelect.value] || [];
@@ -126,31 +128,13 @@
     if (opt && opt.dataset.lat) {
       latInput.value = opt.dataset.lat;
       lonInput.value = opt.dataset.lon;
-      status.textContent = '';
     }
-  });
-
-  document.getElementById('use-location').addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      status.textContent = 'Geolocation not supported on this device.';
-      return;
-    }
-    status.textContent = 'Getting your location…';
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        latInput.value = pos.coords.latitude;
-        lonInput.value = pos.coords.longitude;
-        lgaSelect.value = '';
-        status.textContent = 'Location captured.';
-      },
-      () => { status.textContent = 'Could not get your location — pick a state and LGA instead.'; }
-    );
   });
 
   document.getElementById('report-form').addEventListener('submit', (e) => {
     if (!latInput.value || !lonInput.value) {
       e.preventDefault();
-      alert('Please pick a state and LGA, or use your current location first.');
+      alert('Please pick a state and LGA.');
       return;
     }
     // Belt-and-suspenders against a double-tap firing two submissions before
@@ -217,7 +201,6 @@
     });
     stateSelect.addEventListener('change', saveDraft);
     lgaSelect.addEventListener('change', saveDraft);
-    document.getElementById('use-location').addEventListener('click', () => setTimeout(saveDraft, 1500));
   }
 </script>
 {% endblock %}

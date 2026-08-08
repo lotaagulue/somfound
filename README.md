@@ -20,7 +20,7 @@ In many Nigerian villages, information about local events — a robbery, a burst
    an optional LLM fallback (Gemini, then Mistral if Gemini itself is unavailable — both free
    tier) takes a shot at it instead of just defaulting to "Other." Entirely optional, off unless
    the corresponding API key is set, and never blocks submission if neither is available.
-3. Drop a pin (GPS location) or pick a **state, then LGA** from a list — the location model is LGA-level (Local Government Area), not individual villages, matching how the org's own plans already describe its coverage area.
+3. Pick a **state, then LGA** from a list — the location model is LGA-level (Local Government Area), not individual villages, matching how the org's own plans already describe its coverage area. (A "use my current location" GPS option existed briefly but was removed ahead of an in-person demo — it would place pins at wherever the audience physically is, not South-East Nigeria; revisit once that's actually useful.)
 4. Submit → goes to moderator queue → published to the map once approved.
 
 ### B. Report via SMS (any phone)
@@ -138,7 +138,7 @@ One stack, kept deliberately small so the demo runs on **entirely free infrastru
 
 ## 7. MVP scope (all 5 South-East states / 95 LGAs — real geographic scope from day one)
 
-- ✅ Web report form (no login, GPS or state→LGA picker, category/urgency auto-detected from the description via keyword matching with an optional Gemini/Mistral LLM fallback and a manual-override option) — `/report`
+- ✅ Web report form (no login, state→LGA picker, category/urgency auto-detected from the description via keyword matching with an optional Gemini/Mistral LLM fallback and a manual-override option) — `/report`
 - ✅ SMS report via free-text keyword parsing — `POST /sms/inbound` (real gateway, future) and `/sms/simulate` (in-app demo, no gateway needed)
 - ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date — `/`
 - ✅ Moderator queue (approve/reject/resolve) — `/moderate`
