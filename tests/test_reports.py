@@ -235,3 +235,61 @@ def test_web_report_explicit_category_and_urgency_override_the_guess(client, mod
     assert "Community &amp; Development" in queue.text or "Community & Development" in queue.text
 
     _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+# --- Resubmission (browser "back" past a no-store page, double-tap, etc.) ---
+
+
+def test_resubmitting_the_same_token_replays_the_original_wallet_code(client, moderator_auth):
+    # No phone — this is exactly the reported bug: hitting "back" to a
+    # no-store confirmation page and having the browser resend the POST used
+    # to mint a *second*, orphaned anonymous wallet with a different code.
+    payload = _report_payload("resubmit-replay-marker", category="", urgency="", submission_token="tok-replay-1")
+
+    first = client.post("/report", data=payload)
+    assert first.status_code == 200
+    first_code = first.text.split("reward wallet code: <strong>")[1].split("</strong>")[0]
+
+    second = client.post("/report", data=payload)  # exact same body, same token
+    assert second.status_code == 200
+    second_code = second.text.split("reward wallet code: <strong>")[1].split("</strong>")[0]
+
+    assert second_code == first_code, "resubmission minted a new wallet instead of replaying the original"
+
+    # Only one report actually got created, not two.
+    queue = client.get("/moderate", auth=moderator_auth)
+    assert queue.text.count("resubmit-replay-marker") == 1
+
+    _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+def test_a_fresh_token_creates_an_independent_report(client, moderator_auth):
+    first = client.post(
+        "/report", data=_report_payload("fresh-token-marker-1", submission_token="tok-fresh-a")
+    )
+    second = client.post(
+        "/report", data=_report_payload("fresh-token-marker-2", submission_token="tok-fresh-b")
+    )
+    first_code = first.text.split("reward wallet code: <strong>")[1].split("</strong>")[0]
+    second_code = second.text.split("reward wallet code: <strong>")[1].split("</strong>")[0]
+    assert first_code != second_code
+
+    queue = client.get("/moderate", auth=moderator_auth)
+    assert "fresh-token-marker-1" in queue.text
+    assert "fresh-token-marker-2" in queue.text
+
+    for _ in range(2):
+        _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+def test_wallet_recovery_tip_shown_only_when_no_phone_was_given(client, moderator_auth):
+    anonymous = client.post("/report", data=_report_payload("no-phone-tip-marker"))
+    assert "Tip:" in anonymous.text and "no code to save" in anonymous.text
+
+    with_phone = client.post(
+        "/report", data=_report_payload("phone-given-no-tip-marker", phone="+2348011119999")
+    )
+    assert "Tip:" not in with_phone.text
+
+    for _ in range(2):
+        _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))

@@ -1,6 +1,7 @@
 """Public-facing HTML pages: the map and the web report form."""
 
 import json
+import secrets
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.templating import Jinja2Templates
@@ -16,6 +17,7 @@ from somfound.models import (
     Category,
     SourceChannel,
     Urgency,
+    Wallet,
 )
 from somfound.paths import TEMPLATES_DIR
 from somfound.seed import STATES
@@ -83,13 +85,23 @@ def _report_form_context(session: Session, **extra) -> dict:
         "auto_categorized": False,
         "detected_category_label": "",
         "detected_urgency_label": "",
+        "submission_token": "",
+        "gave_phone": False,
         **extra,
     }
 
 
 @router.get("/report")
 def report_form(request: Request, session: Session = Depends(get_session)):
-    return templates.TemplateResponse(request, "report_form.html", _report_form_context(session))
+    # A fresh, random token per form load — echoed back as a hidden field and
+    # checked on submit (see submit_report) so a browser resubmitting this
+    # exact POST (e.g. hitting "back" past a no-store page, or a double-tap)
+    # replays the original confirmation instead of silently creating a
+    # second report and, worse, a second orphaned anonymous wallet.
+    token = secrets.token_urlsafe(16)
+    return templates.TemplateResponse(
+        request, "report_form.html", _report_form_context(session, submission_token=token)
+    )
 
 
 @router.post("/report")
@@ -103,8 +115,27 @@ def submit_report(
     lga_id: int | None = Form(None),
     phone: str = Form(""),
     wallet_code: str = Form(""),
+    submission_token: str = Form(""),
     session: Session = Depends(get_session),
 ):
+    # Checked before anything else — a resubmission of an already-processed
+    # token isn't a new report at all, so it shouldn't be validated,
+    # rate-limited, or given a fresh wallet; just show what already happened.
+    existing = crud.find_report_by_submission_token(session, submission_token)
+    if existing is not None:
+        wallet = session.get(Wallet, existing.wallet_id) if existing.wallet_id else None
+        return templates.TemplateResponse(
+            request,
+            "report_form.html",
+            _report_form_context(
+                session,
+                submitted=True,
+                wallet_code=wallet.wallet_code if wallet else "",
+                gave_phone=bool(wallet.phone_hash) if wallet else False,
+                submission_token=submission_token,
+            ),
+        )
+
     if len(description) > MAX_DESCRIPTION_LENGTH:
         return templates.TemplateResponse(
             request, "report_form.html", _report_form_context(session, description_too_long=True)
@@ -159,6 +190,7 @@ def submit_report(
         reporter_contact=phone,
         reporter_ref=reporter_ref,
         wallet_id=wallet.id,
+        submission_token=submission_token,
     )
     return templates.TemplateResponse(
         request,
@@ -167,8 +199,13 @@ def submit_report(
             session,
             submitted=True,
             wallet_code=wallet.wallet_code,
+            gave_phone=bool(wallet.phone_hash),
             auto_categorized=auto_categorized,
             detected_category_label=CATEGORY_LABELS[final_category],
             detected_urgency_label=URGENCY_LABELS[final_urgency],
+            # Echoed back into the hidden field: if THIS response is what
+            # ends up getting resubmitted (browser "back" past no-store,
+            # etc.), the check at the top of this function will match it.
+            submission_token=submission_token,
         ),
     )

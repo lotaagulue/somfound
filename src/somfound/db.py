@@ -60,6 +60,10 @@ def _run_additive_migrations() -> None:
       DB-level FK constraint (consistent with lga_id above) — an old report
       predating this feature just has wallet_id=NULL, points_awarded=0,
       which is exactly correct: it never had a wallet to award points to.
+    - Report.submission_token (resubmission/idempotency guard for the web
+      report form — see models.py's docstring on the field), default '' so
+      existing rows (which never had a token to begin with) just aren't
+      replay-matchable, which is correct: nothing to replay.
     """
     inspector = inspect(engine)
     if "report" not in inspector.get_table_names():
@@ -74,6 +78,8 @@ def _run_additive_migrations() -> None:
             conn.execute(text("ALTER TABLE report ADD COLUMN wallet_id INTEGER"))
         if "points_awarded" not in columns:
             conn.execute(text("ALTER TABLE report ADD COLUMN points_awarded INTEGER DEFAULT 0"))
+        if "submission_token" not in columns:
+            conn.execute(text("ALTER TABLE report ADD COLUMN submission_token VARCHAR DEFAULT ''"))
 
 
 def init_db() -> None:

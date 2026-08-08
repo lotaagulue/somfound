@@ -64,6 +64,16 @@ def count_pending_reports(session: Session, reporter_ref: str) -> int:
     ).one()
 
 
+def find_report_by_submission_token(session: Session, submission_token: str) -> Report | None:
+    """A blank token never matches anything (see Report.submission_token's
+    docstring) — every row defaults to '', so bailing out early here avoids
+    an empty-token submission accidentally "replaying" an unrelated old
+    report."""
+    if not submission_token:
+        return None
+    return session.exec(select(Report).where(Report.submission_token == submission_token)).first()
+
+
 def create_report(
     session: Session,
     *,
@@ -78,6 +88,7 @@ def create_report(
     reporter_contact: str = "",
     reporter_ref: str | None = None,
     wallet_id: int | None = None,
+    submission_token: str = "",
 ) -> Report:
     report = Report(
         category=category,
@@ -95,6 +106,7 @@ def create_report(
         # reporter_contact as before.
         reporter_ref=reporter_ref if reporter_ref is not None else hash_reporter_contact(reporter_contact),
         wallet_id=wallet_id,
+        submission_token=submission_token,
     )
     session.add(report)
     session.commit()

@@ -95,6 +95,7 @@ Report
   reporter_ref                hashed phone or anonymous session id (never raw phone in plaintext)
   confirmations_count          int, default 0 — see ReportConfirmation
   wallet_id, points_awarded     see Wallet — §13, Phase C reward system
+  submission_token              web-form resubmission guard, blank for SMS — see CLAUDE.md
   created_at, published_at, resolved_at
   moderator_notes
 
