@@ -63,6 +63,20 @@ webhook — under `src/somfound/`:
   SMS's lead-with-a-keyword convention. Category/urgency are optional form fields; a blank one
   is auto-detected, an explicit one overrides the guess for that field only. Both functions are
   covered directly by `tests/test_sms_parser.py` with no DB/app needed.
+- **`llm_classifier.py`** — optional LLM fallback for the *same* auto-detection, used only when
+  `guess_category_urgency()` finds no keyword at all *and* the reporter left both fields blank
+  (not a second opinion on cases keywords already handle — keeps it limited to where it adds
+  value and keeps free-tier quota usage low). Dormant unless `GEMINI_API_KEY` is set, same
+  pattern as `sms_client.py`: any failure (missing key, network error, timeout, unparseable
+  response) returns `None` and the caller falls back to the existing `OTHER`/`MODERATE`
+  default — a Gemini outage must never break report submission. Uses `google-genai`'s
+  structured-output mode (`response_json_schema` constrained to the real `Category`/`Urgency`
+  enum values) rather than parsing freeform text. Enforces its own hard wall-clock timeout via
+  `ThreadPoolExecutor` rather than trusting the SDK's own `http_options.timeout` — that has
+  documented reliability issues upstream (googleapis/python-genai#911, #1330) and also has a
+  server-side *minimum* of 10s, too slow to gate a request path on. `_call_gemini()` is split
+  out specifically so tests can monkeypatch just that function (see `tests/test_llm_classifier.py`)
+  without a real API key or network access — the CI environment never has one.
 - **`sms_service.py`** — `process_inbound_sms()`: the shared pipeline (parse → per-phone
   rate limit → create `Report` → log `SmsInbound`) used by both `POST /sms/inbound` (a real
   webhook, shaped for a future SMS gateway) and `/sms/simulate` (the in-app demo UI). Keep
