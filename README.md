@@ -200,14 +200,26 @@ webhook — is served from one deployment. No separate frontend/backend split ne
    - `AT_USERNAME` / `AT_API_KEY` — only for a real SMS gateway later; not needed for the demo (`/sms/simulate` needs nothing).
 4. Deploy. Demo the SMS pipeline at `https://<your-app>.vercel.app/sms/simulate` — no gateway needed.
 
-**If the deployed URL returns `{"detail":"Not Found"}`:** that's FastAPI's own 404 — the app
-booted fine, a route just isn't matching. First hit `https://<your-app>.vercel.app/api/health`:
-if that responds, the app and DB are fine and it's specifically the root-path rewrite not
-applying (check Vercel's dashboard → your project → Deployments → latest → **Functions** tab
-confirms `api/index.py` is listed; **Runtime Logs** shows the actual request path; redeploy
-after any `vercel.json` change since it's read at build time). If `/api/health` *also* 404s,
-the function itself isn't being invoked — check the Framework Preset in Project Settings isn't
-overriding `vercel.json`, and that Root Directory is the repo root.
+**If the deployed URL returns `{"detail":"Not Found"}` on every path:** two real bugs produced
+exactly this during development, both already fixed in this repo, worth knowing about if a
+future Vercel runtime change reopens either:
+
+1. Vercel's edge was caching the function's response by rewrite *destination* rather than the
+   original request URL (nothing set `Cache-Control`), so every distinct path served the same
+   frozen response from whichever request happened to populate the cache first — fixed by
+   `main.py` setting `Cache-Control: no-store` on every response.
+2. Vercel's Python runtime delivers every rewritten request with `scope["path"]` hardcoded to
+   the function's own address (`/api/index`), not the original browsed URL, so plain routing
+   can't tell `/` from `/report` apart — fixed via `vercel_compat.py` (see CLAUDE.md for the
+   mechanism: the rewrite passes the real path through as a query param, restored by a small
+   ASGI middleware before routing happens).
+
+If `{"detail":"Not Found"}` shows up again after those fixes, check `requested_path` in the
+response body first (the app's own 404 handler includes it) — if it's `/api/index` again, one
+of the two workarounds above got reverted or the Vercel runtime changed behavior again. If
+`https://<your-app>.vercel.app/api/health` itself 404s, the function isn't being invoked at
+all — check the Framework Preset in Project Settings isn't overriding `vercel.json`, and that
+Root Directory is the repo root.
 
 ### Known limitation: SQLite resets on Vercel (fix with Supabase)
 
