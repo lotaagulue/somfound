@@ -4,13 +4,11 @@ for whenever a real SMS gateway is wired up) and the in-app SMS simulator
 
 from dataclasses import dataclass
 
-from sqlmodel import Session, func, select
+from sqlmodel import Session
 
 from somfound import crud
-from somfound.models import CATEGORY_LABELS, URGENCY_LABELS, Category, Report, SmsInbound, SourceChannel, Status, Urgency
+from somfound.models import CATEGORY_LABELS, URGENCY_LABELS, Category, SmsInbound, SourceChannel, Urgency
 from somfound.sms_parser import parse_sms
-
-MAX_PENDING_PER_REPORTER = 3  # light per-phone rate limit against spam/abuse
 
 
 @dataclass
@@ -37,13 +35,8 @@ def process_inbound_sms(session: Session, *, from_phone: str, text: str) -> SmsO
     parsed = parse_sms(text, lgas)
     reporter_ref = crud.hash_reporter_contact(from_phone)
 
-    pending_count = session.exec(
-        select(func.count())
-        .select_from(Report)
-        .where(Report.reporter_ref == reporter_ref, Report.status == Status.PENDING)
-    ).one()
-
-    rate_limited = pending_count >= MAX_PENDING_PER_REPORTER
+    pending_count = crud.count_pending_reports(session, reporter_ref)
+    rate_limited = pending_count >= crud.MAX_PENDING_PER_REPORTER
     linked_report_id = None
 
     if not rate_limited:
