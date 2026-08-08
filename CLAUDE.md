@@ -53,10 +53,16 @@ webhook — under `src/somfound/`:
   hardcoding labels/colors. The location model is LGA-level (Local Government Area —
   Nigeria's admin unit below state), not individual villages; `LGA.state` is one of the 5
   South-East states.
-- **`sms_parser.py`** — pure function, no I/O: turns freeform SMS text into
-  `(category, urgency, description, lga)` via a leading-keyword map, escalation words, and
+- **`sms_parser.py`** — pure functions, no I/O. `parse_sms()` turns freeform SMS text into
+  `(category, urgency, description, lga)` via a *leading*-keyword map, escalation words, and
   LGA-name matching (longest name first, to avoid a shorter name winning a substring
-  collision). Covered directly by `tests/test_sms_parser.py` with no DB/app needed.
+  collision). `guess_category_urgency()` shares the same `KEYWORD_MAP`/`ESCALATE_WORDS` but
+  scans the *whole* text (earliest match wins, whole-word regex so e.g. `ROAD` doesn't
+  false-positive inside `BROADBAND`) instead of only the first token — used by the web report
+  form (`routers/pages.py::submit_report`), where people write a normal sentence rather than
+  SMS's lead-with-a-keyword convention. Category/urgency are optional form fields; a blank one
+  is auto-detected, an explicit one overrides the guess for that field only. Both functions are
+  covered directly by `tests/test_sms_parser.py` with no DB/app needed.
 - **`sms_service.py`** — `process_inbound_sms()`: the shared pipeline (parse → per-phone
   rate limit → create `Report` → log `SmsInbound`) used by both `POST /sms/inbound` (a real
   webhook, shaped for a future SMS gateway) and `/sms/simulate` (the in-app demo UI). Keep

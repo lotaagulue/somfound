@@ -187,3 +187,47 @@ def test_web_report_description_too_long_is_rejected(client):
 
     public = client.get("/api/reports").json()
     assert not any(r["description"] == too_long for r in public)
+
+
+def test_web_report_auto_categorizes_when_left_blank(client, moderator_auth):
+    # Distinct phone so this doesn't touch the shared anonymous-IP
+    # rate-limit bucket used by other tests in this file.
+    response = client.post(
+        "/report",
+        data=_report_payload(
+            "There was an armed robbery last night, please send crime officers auto-guess-marker",
+            category="",
+            urgency="",
+            phone="+2348033334444",
+        ),
+    )
+    assert response.status_code == 200
+    assert "We categorized this as" in response.text
+    assert "Crime &amp; Safety" in response.text or "Crime & Safety" in response.text
+    assert "Critical" in response.text  # HIGH from CRIME, escalated by "armed"
+
+    queue = client.get("/moderate", auth=moderator_auth)
+    assert "auto-guess-marker" in queue.text
+    assert "Crime &amp; Safety" in queue.text or "Crime & Safety" in queue.text
+
+    _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
+
+
+def test_web_report_explicit_category_and_urgency_override_the_guess(client, moderator_auth):
+    response = client.post(
+        "/report",
+        data=_report_payload(
+            "There was an armed robbery — explicit-override-marker",
+            category="community_dev",
+            urgency="informational",
+            phone="+2348044445555",
+        ),
+    )
+    assert response.status_code == 200
+    assert "We categorized this as" not in response.text  # both fields were explicit, nothing auto-detected
+
+    queue = client.get("/moderate", auth=moderator_auth)
+    assert "explicit-override-marker" in queue.text
+    assert "Community &amp; Development" in queue.text or "Community & Development" in queue.text
+
+    _approve(client, moderator_auth, _approve_and_get_id(client, moderator_auth))
