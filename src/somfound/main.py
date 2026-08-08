@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -24,6 +24,14 @@ _init_and_seed()
 
 app = FastAPI(title="Somfound")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+@app.get("/sw.js")
+def service_worker() -> FileResponse:
+    """Served from the root path (not /static/sw.js) so its default scope
+    covers the whole origin — a service worker can only control paths at or
+    below the directory its own script lives in."""
+    return FileResponse(STATIC_DIR / "sw.js", media_type="application/javascript")
+
 
 app.include_router(pages.router)
 app.include_router(moderation.router)

@@ -33,8 +33,16 @@ webhook — under `src/somfound/`:
 - **`static/style.css`** — one stylesheet, mobile-first-ish with a `max-width: 640px` breakpoint
   (nav collapses to a CSS-only checkbox-hack hamburger, forms/legend/moderation cards restack,
   tap targets sized to 44px). `static/manifest.json` + `static/icons/` make it installable to a
-  phone home screen (PWA-lite — no service worker, so no offline support, just the manifest +
-  icons). Icons were generated locally with Pillow as a one-off (`uv run --with pillow ...`,
+  phone home screen. `static/sw.js` (served at `/sw.js`, not `/static/sw.js`, so its scope
+  covers the whole origin — see the route in `main.py`) adds a deliberately minimal service
+  worker: cache-first for map tiles + the CDN Leaflet assets (the expensive part of loading the
+  map on a slow connection), cache-first for our own static assets, and a friendly offline
+  fallback page for navigations instead of the browser's dead-connection screen. It does **not**
+  cache dynamic content (reports, API responses) or queue failed POSTs — that's real
+  background-sync territory, out of scope for this MVP. The report form's own draft-autosave
+  (plain `localStorage`, see `report_form.html`) is what actually protects against losing a
+  typed report mid-fill on a dropped connection, independent of the service worker. Icons were
+  generated locally with Pillow as a one-off (`uv run --with pillow ...`,
   not a project dependency) — regenerate the same way if the brand mark changes.
 - **`models.py`** — SQLModel tables (`Report`, `LGA`, `SmsInbound`, plus Phase C's
   `Resource`, `ReportConfirmation`, `Wallet`, `RewardOption`, `RedemptionRequest`) and the
