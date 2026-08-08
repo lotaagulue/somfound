@@ -118,6 +118,24 @@
     return params.toString();
   }
 
+  const URGENCY_RANK = { informational: 0, moderate: 1, high: 2, critical: 3 };
+
+  function reportPopupHtml(r) {
+    const resolved = r.status === 'resolved';
+    const confirmLabel = r.confirmations_count > 0
+      ? `Confirm — ${r.confirmations_count} neighbor${r.confirmations_count === 1 ? '' : 's'} already have`
+      : 'Confirm this is happening';
+    const confirmButton = resolved
+      ? ''
+      : `<br><button class="confirm-btn" onclick="confirmReport(${r.id}, this)">${confirmLabel}</button>`;
+    return (
+      `<strong>${r.category_label}</strong> · ${resolved ? 'Resolved' : r.urgency_label}<br>` +
+      `${r.description}<br>` +
+      `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>` +
+      confirmButton
+    );
+  }
+
   async function loadReports() {
     setMapStatus('Loading reports…', false);
     try {
@@ -126,26 +144,40 @@
       const reports = await res.json();
       setMapStatus('', false);
       markers.clearLayers();
+
+      // Group reports sharing exact coordinates into one marker instead of
+      // stacking separate markers invisibly on top of each other. This is
+      // common, not a rare edge case — anyone who reports via the state/LGA
+      // picker (rather than a precise GPS pin) gets that LGA's centroid, so
+      // any two reports in the same LGA collide exactly.
+      const byCoord = new Map();
       reports.forEach((r) => {
-        const resolved = r.status === 'resolved';
+        const key = `${r.lat},${r.lon}`;
+        if (!byCoord.has(key)) byCoord.set(key, []);
+        byCoord.get(key).push(r);
+      });
+
+      byCoord.forEach((group) => {
+        // The marker's own look represents the most urgent still-active
+        // report in the group (a resolved one shouldn't visually mask a
+        // real active one sharing its spot); the popup lists every report.
+        const representative = group.reduce((best, r) => {
+          if (best.status === 'resolved' && r.status !== 'resolved') return r;
+          if (r.status === 'resolved' && best.status !== 'resolved') return best;
+          return URGENCY_RANK[r.urgency] > URGENCY_RANK[best.urgency] ? r : best;
+        });
+        const resolved = representative.status === 'resolved';
+        const countBadge = group.length > 1 ? `<span class="pin-count">${group.length}</span>` : '';
         const icon = L.divIcon({
-          html: `<span class="pin${resolved ? ' pin-resolved' : ''}" style="background:${r.color}">${r.icon}</span>`,
+          html: `<span class="pin${resolved ? ' pin-resolved' : ''}" style="background:${representative.color}">${representative.icon}</span>${countBadge}`,
           className: '',
           iconSize: [28, 28],
         });
-        const marker = L.marker([r.lat, r.lon], { icon });
-        const confirmLabel = r.confirmations_count > 0
-          ? `Confirm — ${r.confirmations_count} neighbor${r.confirmations_count === 1 ? '' : 's'} already have`
-          : 'Confirm this is happening';
-        const confirmButton = resolved
-          ? ''
-          : `<br><button class="confirm-btn" onclick="confirmReport(${r.id}, this)">${confirmLabel}</button>`;
-        marker.bindPopup(
-          `<strong>${r.category_label}</strong> · ${resolved ? 'Resolved' : r.urgency_label}<br>` +
-          `${r.description}<br>` +
-          `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>` +
-          confirmButton
-        );
+        const marker = L.marker([representative.lat, representative.lon], { icon });
+        const popupHtml = group.length > 1
+          ? `<strong>${group.length} reports here</strong><hr>` + group.map(reportPopupHtml).join('<hr>')
+          : reportPopupHtml(group[0]);
+        marker.bindPopup(popupHtml, { maxHeight: 260 });
         markers.addLayer(marker);
       });
     } catch (e) {
