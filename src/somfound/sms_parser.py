@@ -1,13 +1,21 @@
-"""Freeform-SMS parsing.
+"""Freeform-text parsing shared by both inbound channels.
 
-Reporters text something like `WATER Nsukka borehole broken 3 days no fix`
-with no rigid syntax required — the leading keyword (if recognized) sets the
-category/urgency, any known LGA name mentioned anywhere in the message is
-matched, and a few escalation words ("URGENT", "NOW", ...) bump the urgency
-up a notch. Anything unrecognized still becomes a report — it just lands in
-the queue as `other` / `moderate` for a moderator to reclassify.
+SMS (`parse_sms`): reporters text something like `WATER Nsukka borehole
+broken 3 days no fix` with no rigid syntax required — the *leading* keyword
+(if recognized) sets the category/urgency, any known LGA name mentioned
+anywhere in the message is matched, and a few escalation words ("URGENT",
+"NOW", ...) bump the urgency up a notch.
+
+Web (`guess_category_urgency`): the report form lets someone just describe
+what's happening in a normal sentence rather than lead with a keyword
+("there was an armed robbery near the market"), so it scans the *whole*
+sentence instead of just the first word — same keyword map, same escalation
+words, just a different matching position. Both fall back to `other` /
+`moderate` when nothing matches; a human (moderator) always gets a chance to
+correct it before anything goes public either way.
 """
 
+import re
 from dataclasses import dataclass
 
 from somfound.models import LGA, Category, Urgency
@@ -37,6 +45,34 @@ def _escalate(urgency: Urgency) -> Urgency:
     return _URGENCY_ORDER[min(idx + 1, len(_URGENCY_ORDER) - 1)]
 
 
+def _word_present(word: str, upper_text: str) -> bool:
+    """Whole-word match, case-insensitive — a plain substring check would
+    let e.g. "ROAD" false-positive inside "BROADBAND", or "ARMED" inside
+    "FARMED"."""
+    return re.search(rf"\b{re.escape(word)}\b", upper_text) is not None
+
+
+def _is_escalated(text: str) -> bool:
+    upper_text = text.upper()
+    return any(_word_present(word, upper_text) for word in ESCALATE_WORDS)
+
+
+def _first_keyword_match(text: str) -> tuple[Category, Urgency] | None:
+    """The earliest (in reading order) recognized keyword anywhere in the
+    text, whole-word matched. Used by guess_category_urgency — parse_sms
+    only ever checks the leading token, which is cheaper and doesn't need
+    this."""
+    upper_text = text.upper()
+    best_position = None
+    best_mapping = None
+    for keyword, mapping in KEYWORD_MAP.items():
+        match = re.search(rf"\b{re.escape(keyword)}\b", upper_text)
+        if match and (best_position is None or match.start() < best_position):
+            best_position = match.start()
+            best_mapping = mapping
+    return best_mapping
+
+
 @dataclass
 class ParsedSms:
     category: Category
@@ -59,7 +95,7 @@ def parse_sms(text: str, known_lgas: list[LGA]) -> ParsedSms:
         category, urgency = Category.OTHER, Urgency.MODERATE
         description = text
 
-    if any(word in text.upper() for word in ESCALATE_WORDS):
+    if _is_escalated(text):
         urgency = _escalate(urgency)
 
     lower_text = text.lower()
@@ -79,3 +115,26 @@ def parse_sms(text: str, known_lgas: list[LGA]) -> ParsedSms:
         keyword_matched=mapping is not None,
         lga=lga,
     )
+
+
+def guess_category_urgency(text: str) -> tuple[Category, Urgency, bool]:
+    """Auto-suggest a category/urgency for the web report form, where people
+    write a normal sentence rather than SMS's lead-with-a-keyword
+    convention. Same keyword map and escalation words as parse_sms, just
+    matched anywhere in the text (earliest match wins if more than one
+    keyword appears) instead of only the first token. Falls back to
+    (OTHER, MODERATE, False) — same as SMS's fallback — when nothing
+    matches; a moderator still reviews every report before it's public
+    either way, so this is a helpful default, not a final word."""
+    mapping = _first_keyword_match(text)
+    if mapping:
+        category, urgency = mapping
+        keyword_matched = True
+    else:
+        category, urgency = Category.OTHER, Urgency.MODERATE
+        keyword_matched = False
+
+    if _is_escalated(text):
+        urgency = _escalate(urgency)
+
+    return category, urgency, keyword_matched

@@ -1,5 +1,5 @@
 from somfound.models import LGA, Category, Urgency
-from somfound.sms_parser import parse_sms
+from somfound.sms_parser import guess_category_urgency, parse_sms
 
 LGAS = [LGA(id=1, name="Nsukka", state="Enugu", lat=6.86, lon=7.40)]
 
@@ -46,3 +46,46 @@ def test_longest_lga_name_wins_on_substring_collision():
     parsed = parse_sms("ROAD damaged in Isiala Ngwa South after rain", lgas)
     assert parsed.lga is not None
     assert parsed.lga.name == "Isiala Ngwa South"
+
+
+# --- guess_category_urgency (web form's freeform-sentence auto-categorization) ---
+
+
+def test_guess_matches_keyword_anywhere_in_a_natural_sentence():
+    category, urgency, matched = guess_category_urgency(
+        "There was an armed robbery last night, please send crime officers"
+    )
+    assert category == Category.CRIME_SAFETY
+    assert urgency == Urgency.CRITICAL  # HIGH from CRIME, escalated by "armed"
+    assert matched
+
+
+def test_guess_avoids_substring_false_positive():
+    # "broadband" contains "road" as a substring — must not match ROAD.
+    category, urgency, matched = guess_category_urgency(
+        "The broadband service in our village has been down for a week"
+    )
+    assert category == Category.OTHER
+    assert not matched
+
+
+def test_guess_earliest_keyword_in_reading_order_wins():
+    category, _, matched = guess_category_urgency(
+        "The road by the school has been blocked, and there was also a crime committed nearby"
+    )
+    assert matched
+    assert category == Category.INFRASTRUCTURE  # "road" appears before "crime"
+
+
+def test_guess_escalation_word_still_bumps_urgency():
+    category, urgency, matched = guess_category_urgency("The road is blocked, this is urgent")
+    assert matched
+    assert category == Category.INFRASTRUCTURE
+    assert urgency == Urgency.HIGH  # ROAD's default MODERATE, escalated by "urgent"
+
+
+def test_guess_falls_back_to_other_like_sms_does():
+    category, urgency, matched = guess_category_urgency("Just wanted to say hello to everyone")
+    assert category == Category.OTHER
+    assert urgency == Urgency.MODERATE
+    assert not matched

@@ -13,8 +13,11 @@ In many Nigerian villages, information about local events — a robbery, a burst
 ### A. Report via web app (smartphone/desktop)
 
 1. Open Somfound in a browser (no login required for MVP — optional phone number for follow-up).
-2. Drop a pin (GPS location) or pick a **state, then LGA** from a list — the location model is LGA-level (Local Government Area), not individual villages, matching how the org's own plans already describe its coverage area.
-3. Choose a category, write a short description, optionally attach a photo.
+2. Write a short description of what's happening, in your own words — category and urgency are
+   auto-detected from it (same keyword-matching approach as the SMS pipeline, just scanning the
+   whole sentence instead of requiring a leading keyword), with an optional "set it yourself"
+   disclosure for anyone who wants to pick them manually instead.
+3. Drop a pin (GPS location) or pick a **state, then LGA** from a list — the location model is LGA-level (Local Government Area), not individual villages, matching how the org's own plans already describe its coverage area.
 4. Submit → goes to moderator queue → published to the map once approved.
 
 ### B. Report via SMS (any phone)
@@ -131,7 +134,7 @@ One stack, kept deliberately small so the demo runs on **entirely free infrastru
 
 ## 7. MVP scope (all 5 South-East states / 95 LGAs — real geographic scope from day one)
 
-- ✅ Web report form (no login, GPS or state→LGA picker) — `/report`
+- ✅ Web report form (no login, GPS or state→LGA picker, category/urgency auto-detected from the description with a manual-override option) — `/report`
 - ✅ SMS report via free-text keyword parsing — `POST /sms/inbound` (real gateway, future) and `/sms/simulate` (in-app demo, no gateway needed)
 - ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date — `/`
 - ✅ Moderator queue (approve/reject/resolve) — `/moderate`

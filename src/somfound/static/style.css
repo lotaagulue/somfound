@@ -334,13 +334,13 @@ code {
 }
 .optional { font-weight: 400; color: var(--ink-faint); }
 
-.wallet-code-disclosure summary {
+.form-disclosure summary {
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--brand);
 }
-.wallet-code-disclosure label { margin-top: 0.7rem; }
+.form-disclosure label { margin-top: 0.7rem; }
 
 .banner {
   padding: 0.85rem 1.1rem;

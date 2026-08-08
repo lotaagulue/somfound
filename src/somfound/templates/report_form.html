@@ -6,6 +6,10 @@
   {% if submitted %}
   <p class="banner banner-success">
     Thanks — your report was submitted and is waiting for moderator review before it appears on the map.
+    {% if auto_categorized %}
+    <br>We categorized this as <strong>{{ detected_category_label }}</strong> · <strong>{{ detected_urgency_label }}</strong> urgency
+    based on your description — a moderator will double-check before it's published.
+    {% endif %}
     <br>Your reward wallet code: <strong>{{ wallet_code }}</strong> — save this. Verified reports (especially
     crime/safety tips) can earn points here, redeemable for airtime or a gift card at
     <a href="/wallet">/wallet</a>. This code (or the phone number above, if you gave one) is the only way back in.
@@ -26,25 +30,29 @@
   <p id="draft-restored-hint" class="hint" style="display:none">We restored a report you'd started but hadn't sent yet — keep going, or clear the fields to start fresh.</p>
 
   <form method="post" action="/report" id="report-form">
-    <label>Category
-      <select name="category" required>
-        {% for value, label in categories %}
-        <option value="{{ value }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <label>Urgency
-      <select name="urgency" required>
-        {% for value, label in urgencies %}
-        <option value="{{ value }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
     <label>What's happening?
-      <textarea name="description" rows="4" required maxlength="{{ max_description_length }}" placeholder="Short description — what, where, when"></textarea>
+      <textarea name="description" rows="4" required maxlength="{{ max_description_length }}" placeholder="Describe it in your own words — what, where, when. We'll figure out the category and urgency for you."></textarea>
     </label>
+
+    <details class="form-disclosure">
+      <summary>Want to set the category/urgency yourself?</summary>
+      <label>Category <span class="optional">(optional — leave as "let us guess" and we'll read your description)</span>
+        <select name="category">
+          <option value="">— let us guess from your description —</option>
+          {% for value, label in categories %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Urgency <span class="optional">(optional)</span>
+        <select name="urgency">
+          <option value="">— let us guess from your description —</option>
+          {% for value, label in urgencies %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </details>
 
     <label>State
       <select id="state-select">
@@ -72,7 +80,7 @@
       <input type="tel" name="phone" placeholder="+234...">
     </label>
 
-    <details class="wallet-code-disclosure">
+    <details class="form-disclosure">
       <summary>Already have a reward wallet code from a past report?</summary>
       <label>Reward wallet code <span class="optional">(optional — link this report to it, so any points land in one place. Otherwise a new wallet is created for you.)</span>
         <input type="text" name="wallet_code" placeholder="e.g. K7XQ4M2P">

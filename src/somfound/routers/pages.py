@@ -19,6 +19,7 @@ from somfound.models import (
 )
 from somfound.paths import TEMPLATES_DIR
 from somfound.seed import STATES
+from somfound.sms_parser import guess_category_urgency
 
 router = APIRouter(tags=["pages"])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -79,6 +80,9 @@ def _report_form_context(session: Session, **extra) -> dict:
         "rate_limited": False,
         "description_too_long": False,
         "max_description_length": MAX_DESCRIPTION_LENGTH,
+        "auto_categorized": False,
+        "detected_category_label": "",
+        "detected_urgency_label": "",
         **extra,
     }
 
@@ -91,8 +95,8 @@ def report_form(request: Request, session: Session = Depends(get_session)):
 @router.post("/report")
 def submit_report(
     request: Request,
-    category: Category = Form(...),
-    urgency: Urgency = Form(...),
+    category: str = Form(""),
+    urgency: str = Form(""),
     description: str = Form(...),
     lat: float = Form(...),
     lon: float = Form(...),
@@ -105,6 +109,24 @@ def submit_report(
         return templates.TemplateResponse(
             request, "report_form.html", _report_form_context(session, description_too_long=True)
         )
+
+    # Category/urgency are optional on the form — most reporters just
+    # describe what's happening and we guess, the same keyword-matching
+    # engine SMS uses but scanning the whole sentence instead of only a
+    # leading keyword (see sms_parser.guess_category_urgency). Anyone who
+    # expands the "set it yourself" disclosure and picks an explicit value
+    # overrides the guess for that field only — a moderator still reviews
+    # every report before it's public either way.
+    guessed_category, guessed_urgency, _ = guess_category_urgency(description)
+    try:
+        final_category = Category(category) if category else guessed_category
+    except ValueError:
+        final_category = guessed_category
+    try:
+        final_urgency = Urgency(urgency) if urgency else guessed_urgency
+    except ValueError:
+        final_urgency = guessed_urgency
+    auto_categorized = not category or not urgency
 
     # Unlike SMS (always has a phone), the web form's phone field is
     # optional, so there's nothing to rate-limit against for an anonymous
@@ -127,8 +149,8 @@ def submit_report(
     wallet = crud.resolve_wallet_for_report(session, wallet_code=wallet_code, reporter_contact=phone)
     crud.create_report(
         session,
-        category=category,
-        urgency=urgency,
+        category=final_category,
+        urgency=final_urgency,
         description=description,
         lat=lat,
         lon=lon,
@@ -141,5 +163,12 @@ def submit_report(
     return templates.TemplateResponse(
         request,
         "report_form.html",
-        _report_form_context(session, submitted=True, wallet_code=wallet.wallet_code),
+        _report_form_context(
+            session,
+            submitted=True,
+            wallet_code=wallet.wallet_code,
+            auto_categorized=auto_categorized,
+            detected_category_label=CATEGORY_LABELS[final_category],
+            detected_urgency_label=URGENCY_LABELS[final_urgency],
+        ),
     )
