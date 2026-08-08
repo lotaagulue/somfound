@@ -30,6 +30,12 @@ FastAPI + SQLModel (SQLite by default), server-rendered Jinja2 + Leaflet (via CD
 build step). One process serves everything — public pages, the JSON API, and the SMS
 webhook — under `src/somfound/`:
 
+- **`static/style.css`** — one stylesheet, mobile-first-ish with a `max-width: 640px` breakpoint
+  (nav collapses to a CSS-only checkbox-hack hamburger, forms/legend/moderation cards restack,
+  tap targets sized to 44px). `static/manifest.json` + `static/icons/` make it installable to a
+  phone home screen (PWA-lite — no service worker, so no offline support, just the manifest +
+  icons). Icons were generated locally with Pillow as a one-off (`uv run --with pillow ...`,
+  not a project dependency) — regenerate the same way if the brand mark changes.
 - **`models.py`** — SQLModel tables (`Report`, `Village`, `SmsInbound`) and the enums/label
   dicts (`Category`, `Urgency`, `Status`, `SourceChannel`). `CATEGORY_LABELS`/`CATEGORY_ICONS`
   and `URGENCY_LABELS`/`URGENCY_COLORS` are the single source of truth for how those enums

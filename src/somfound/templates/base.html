@@ -2,9 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Somfound{% endblock %}</title>
   <meta name="description" content="Somfound — community reporting and a live map for villages in South-East Nigeria.">
+
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#2638c4">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Somfound">
+
   <link rel="stylesheet" href="/static/style.css">
   {% block head %}{% endblock %}
 </head>
@@ -13,6 +22,8 @@
     <a class="brand" href="/">
       <span class="brand-mark">Som<span class="brand-mark-accent">Found</span></span>
     </a>
+    <input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox">
+    <label for="nav-toggle" class="nav-toggle-label" aria-label="Menu">&#9776;</label>
     <nav>
       <a href="/">Map</a>
       <a href="/report">Report something</a>
