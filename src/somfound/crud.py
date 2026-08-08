@@ -5,7 +5,18 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from somfound.models import LGA, Category, Report, Resource, ResourceStatus, ResourceType, SourceChannel, Status, Urgency
+from somfound.models import (
+    LGA,
+    Category,
+    Report,
+    ReportConfirmation,
+    Resource,
+    ResourceStatus,
+    ResourceType,
+    SourceChannel,
+    Status,
+    Urgency,
+)
 
 
 def hash_reporter_contact(raw: str) -> str:
@@ -157,3 +168,26 @@ def moderate_report(
     session.commit()
     session.refresh(report)
     return report
+
+
+# --- Peer confirmations ---
+
+
+def confirm_report(session: Session, report: Report, *, session_hash: str) -> tuple[Report, bool]:
+    """Returns (report, was_new). Idempotent: confirming twice from the same
+    anonymous session just returns the current state, doesn't double-count."""
+    already = session.exec(
+        select(ReportConfirmation).where(
+            ReportConfirmation.report_id == report.id,
+            ReportConfirmation.session_hash == session_hash,
+        )
+    ).first()
+    if already:
+        return report, False
+
+    session.add(ReportConfirmation(report_id=report.id, session_hash=session_hash))
+    report.confirmations_count += 1
+    session.add(report)
+    session.commit()
+    session.refresh(report)
+    return report, True

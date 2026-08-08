@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from enum import StrEnum
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
 def _utcnow() -> datetime:
@@ -101,6 +101,7 @@ class Report(SQLModel, table=True):
     source_channel: SourceChannel
     reporter_ref: str = ""  # hashed phone / anonymous session id, never raw phone
     moderator_notes: str = ""
+    confirmations_count: int = 0  # peer confirmations from other reporters — see ReportConfirmation
     created_at: datetime = Field(default_factory=_utcnow)
     published_at: datetime | None = None
     resolved_at: datetime | None = None
@@ -159,6 +160,21 @@ class Resource(SQLModel, table=True):
     notes: str = ""
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class ReportConfirmation(SQLModel, table=True):
+    """One row per (report, anonymous session) that confirmed a report — the
+    dedup record behind Report.confirmations_count. The unique constraint is
+    the real guard against a double-count (e.g. a race between two
+    near-simultaneous clicks); crud.confirm_report also checks first so the
+    common case never even reaches the DB for an integrity error."""
+
+    __table_args__ = (UniqueConstraint("report_id", "session_hash", name="uq_report_confirmation"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    report_id: int = Field(foreign_key="report.id", index=True)
+    session_hash: str = Field(index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class SmsInbound(SQLModel, table=True):
