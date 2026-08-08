@@ -12,6 +12,7 @@
   </p>
   {% endif %}
   <p class="hint">No smartphone? Text the same details to our SMS line instead — <a href="/sms/simulate">try the SMS demo</a>.</p>
+  <p id="draft-restored-hint" class="hint" style="display:none">We restored a report you'd started but hadn't sent yet — keep going, or clear the fields to start fresh.</p>
 
   <form method="post" action="/report" id="report-form">
     <label>Category
@@ -125,5 +126,64 @@
       alert('Please pick a state and LGA, or use your current location first.');
     }
   });
+
+  // Draft autosave: a rural/mobile connection can drop mid-fill, and losing
+  // a typed description is exactly the kind of thing that makes someone not
+  // bother reporting again. Not a full offline queue — just a plain
+  // localStorage save-as-you-type, restored on next visit until submitted.
+  const DRAFT_KEY = 'somfound_report_draft';
+  const wasSubmitted = {{ 'true' if submitted else 'false' }};
+  const form = document.getElementById('report-form');
+
+  if (wasSubmitted) {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* storage unavailable — nothing to clean up */ }
+  } else {
+    try {
+      const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (draft) {
+        let restoredSomething = false;
+        if (draft.category) { form.category.value = draft.category; restoredSomething = true; }
+        if (draft.urgency) { form.urgency.value = draft.urgency; restoredSomething = true; }
+        if (draft.description) { form.description.value = draft.description; restoredSomething = true; }
+        if (draft.phone) { form.phone.value = draft.phone; restoredSomething = true; }
+        if (draft.wallet_code) { form.wallet_code.value = draft.wallet_code; restoredSomething = true; }
+        if (draft.state) {
+          stateSelect.value = draft.state;
+          stateSelect.dispatchEvent(new Event('change'));
+          if (draft.lga_id) { lgaSelect.value = draft.lga_id; }
+          restoredSomething = true;
+        }
+        if (draft.lat && draft.lon) {
+          latInput.value = draft.lat;
+          lonInput.value = draft.lon;
+        }
+        if (restoredSomething) {
+          document.getElementById('draft-restored-hint').style.display = 'block';
+        }
+      }
+    } catch (e) { /* corrupt draft — ignore and start fresh */ }
+
+    function saveDraft() {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          category: form.category.value,
+          urgency: form.urgency.value,
+          description: form.description.value,
+          phone: form.phone.value,
+          wallet_code: form.wallet_code.value,
+          state: stateSelect.value,
+          lga_id: lgaSelect.value,
+          lat: latInput.value,
+          lon: lonInput.value,
+        }));
+      } catch (e) { /* storage unavailable/full — not critical, just skip */ }
+    }
+    ['category', 'urgency', 'description', 'phone', 'wallet_code'].forEach((name) => {
+      form[name].addEventListener('input', saveDraft);
+    });
+    stateSelect.addEventListener('change', saveDraft);
+    lgaSelect.addEventListener('change', saveDraft);
+    document.getElementById('use-location').addEventListener('click', () => setTimeout(saveDraft, 1500));
+  }
 </script>
 {% endblock %}

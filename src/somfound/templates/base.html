@@ -42,5 +42,16 @@
       Moderators: <a href="/moderate">Review queue</a> · <a href="/resources">Kit locations</a> · <a href="/redemptions">Redemptions</a>
     </p>
   </footer>
+  <script>
+    // Best-effort — caches map tiles/assets for slow connections and shows a
+    // friendly offline page instead of a dead-connection error. If this
+    // fails to register for any reason, the app still works exactly as
+    // before, just without that extra resilience.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
