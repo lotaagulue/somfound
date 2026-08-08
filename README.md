@@ -143,6 +143,9 @@ Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-
 
 ## 9. Roadmap
 
+See [PLANNING.md](PLANNING.md) for the fuller backlog behind each phase below — why each item
+matters, not just what it is.
+
 - ~~**Phase 0:** this spec, pick pilot LGA(s), confirm who moderates.~~ Spec done, app live; pilot LGA(s) and moderator team still open (§10).
 - ~~**Phase 1 (MVP):** web report + map + SMS (simulated) + moderator queue.~~ **Done** — live at the deployed URL, now covering all 5 states / 95 LGAs rather than a single-LGA pilot.
 - **Phase 2 (next):** real SMS gateway (paid shortcode), per-moderator accounts + audit trail, community confirmation/upvotes, resolved-status notifications, photo uploads.
