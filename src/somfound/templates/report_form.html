@@ -11,7 +11,7 @@
     <a href="/wallet">/wallet</a>. This code (or the phone number above, if you gave one) is the only way back in.
   </p>
   {% endif %}
-  <p class="hint">No smartphone? Text the same details to our SMS line instead — see the SMS demo section on the map page.</p>
+  <p class="hint">No smartphone? Text the same details to our SMS line instead — <a href="/sms/simulate">try the SMS demo</a>.</p>
 
   <form method="post" action="/report" id="report-form">
     <label>Category
@@ -60,9 +60,12 @@
       <input type="tel" name="phone" placeholder="+234...">
     </label>
 
-    <label>Reward wallet code <span class="optional">(optional — already have one from a past report? Link this report to it. Otherwise a new one is created for you.)</span>
-      <input type="text" name="wallet_code" placeholder="e.g. K7XQ4M2P">
-    </label>
+    <details class="wallet-code-disclosure">
+      <summary>Already have a reward wallet code from a past report?</summary>
+      <label>Reward wallet code <span class="optional">(optional — link this report to it, so any points land in one place. Otherwise a new wallet is created for you.)</span>
+        <input type="text" name="wallet_code" placeholder="e.g. K7XQ4M2P">
+      </label>
+    </details>
 
     <button type="submit">Submit report</button>
   </form>
