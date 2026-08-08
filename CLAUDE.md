@@ -66,6 +66,19 @@ webhook — under `src/somfound/`:
 - **`GET /api/health`** — cheap liveness/config check (DB reachable, which backend, village
   seed count) with no secrets in the response. First thing to hit when a deploy misbehaves,
   before assuming routing is broken.
+- **`vercel_compat.py`** — works around a real, empirically-confirmed Vercel Python-runtime bug:
+  requests forwarded through `vercel.json`'s catch-all rewrite arrive with `scope["path"]`
+  hardcoded to the function's own address (`/api/index`) for *every* request, not the original
+  URL, so plain FastAPI routing can't distinguish `/` from `/report` from `/api/reports`. Fixed
+  by having the rewrite append the real path as a `__path` query param (`destination:
+  "/api/index?__path=/$1"`), then `RestoreOriginalPathMiddleware` restores it before the app's
+  router sees the request. Only wired into `api/index.py`, not `main.py` — local dev and Render
+  never go through this rewrite at all, so they'd be unaffected either way, but keeping it out
+  of `main.py` keeps the workaround visibly scoped to the platform that needs it. If Vercel's
+  Python runtime is rearchitected and this workaround is no longer needed, `tests/test_vercel_compat.py`
+  documents exactly what it does — recheck against a real deploy before removing it, not just
+  the tests, since the tests exercise the middleware in isolation and can't reproduce the
+  original bug's actual trigger (Vercel's edge behavior itself).
 
 ### Deployment targets
 
