@@ -352,6 +352,18 @@ code {
 .banner-warning { background: #fef3d9; color: #8a5a00; border: 1px solid #f6dfa0; }
 .banner code { background: rgba(0,0,0,0.06); padding: 0.1em 0.35em; border-radius: 4px; }
 
+.btn-small {
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.btn-small:hover { background: rgba(0, 0, 0, 0.06); }
+
 /* --- Moderation --- */
 
 .report-card {
