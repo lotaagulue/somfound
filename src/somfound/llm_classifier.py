@@ -163,8 +163,10 @@ def describe_configured_providers() -> str:
     """A short, honest, user-facing note for the report form about which AI
     model(s) can help categorize a report — empty string if neither
     provider is configured, so "dormant" means truly invisible, not just
-    unused. Mirrors the real fallback order (Gemini first, Mistral only as
-    backup), not two providers working in parallel."""
+    unused. Names appear in the same order as the real fallback
+    (guess_category_urgency_with_llm tries Gemini first, Mistral only as
+    backup) even though the copy itself is deliberately simple rather than
+    spelling that mechanism out."""
     names = []
     if GEMINI_API_KEY:
         names.append(_friendly_model_name(GEMINI_MODEL))
@@ -173,9 +175,7 @@ def describe_configured_providers() -> str:
 
     if not names:
         return ""
-    if len(names) == 1:
-        return f"Category/urgency can get AI help from {names[0]} when no keyword matches."
-    return f"Category/urgency can get AI help from {names[0]} (backed up by {names[1]}) when no keyword matches."
+    return f"With help from {' and '.join(names)}"
 
 
 def guess_category_urgency_with_llm(description: str) -> tuple[Category, Urgency] | None:

@@ -143,9 +143,7 @@ def test_describe_configured_providers_mentions_gemini_only(monkeypatch):
     monkeypatch.setattr(llm_classifier, "GEMINI_API_KEY", "fake-key")
     monkeypatch.setattr(llm_classifier, "GEMINI_MODEL", "gemini-3.5-flash")
 
-    note = llm_classifier.describe_configured_providers()
-    assert "Gemini 3.5 Flash" in note
-    assert "backed up by" not in note
+    assert llm_classifier.describe_configured_providers() == "With help from Gemini 3.5 Flash"
 
 
 def test_describe_configured_providers_mentions_both_in_fallback_order(monkeypatch):
@@ -155,5 +153,4 @@ def test_describe_configured_providers_mentions_both_in_fallback_order(monkeypat
     monkeypatch.setattr(llm_classifier, "MISTRAL_MODEL", "mistral-small-latest")
 
     note = llm_classifier.describe_configured_providers()
-    assert "Gemini 3.5 Flash" in note
-    assert "backed up by Mistral Small" in note
+    assert note == "With help from Gemini 3.5 Flash and Mistral Small"
