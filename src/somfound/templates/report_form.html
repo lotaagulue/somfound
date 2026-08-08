@@ -38,6 +38,9 @@
     <label>What's happening?
       <textarea name="description" rows="4" required maxlength="{{ max_description_length }}" placeholder="Describe it in your own words — what, where, when. We'll figure out the category and urgency for you."></textarea>
     </label>
+    {% if ai_assist_note %}
+    <p class="hint">🤖 {{ ai_assist_note }}</p>
+    {% endif %}
 
     <details class="form-disclosure">
       <summary>Want to set the category/urgency yourself?</summary>
