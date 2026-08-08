@@ -102,6 +102,8 @@ class Report(SQLModel, table=True):
     reporter_ref: str = ""  # hashed phone / anonymous session id, never raw phone
     moderator_notes: str = ""
     confirmations_count: int = 0  # peer confirmations from other reporters — see ReportConfirmation
+    wallet_id: int | None = Field(default=None, foreign_key="wallet.id")
+    points_awarded: int = 0  # set once, when a moderator approves — see Wallet
     created_at: datetime = Field(default_factory=_utcnow)
     published_at: datetime | None = None
     resolved_at: datetime | None = None
@@ -175,6 +177,73 @@ class ReportConfirmation(SQLModel, table=True):
     report_id: int = Field(foreign_key="report.id", index=True)
     session_hash: str = Field(index=True)
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+class RedemptionStatus(StrEnum):
+    PENDING = "pending"
+    FULFILLED = "fulfilled"
+    CANCELLED = "cancelled"
+
+
+REDEMPTION_STATUS_LABELS: dict[RedemptionStatus, str] = {
+    RedemptionStatus.PENDING: "Pending",
+    RedemptionStatus.FULFILLED: "Fulfilled",
+    RedemptionStatus.CANCELLED: "Cancelled",
+}
+
+
+class Wallet(SQLModel, table=True):
+    """An anonymous points balance — the internal "currency" reporters earn
+    when a moderator marks their verified report reward-worthy, redeemable
+    for real rewards (gift cards, airtime — see RewardOption). No login: a
+    wallet is identified by a human-typeable `wallet_code`, or by re-entering
+    the same phone number that created it (see crud.find_wallet). Points
+    accrue across every report linked to this wallet, not per-report — one
+    wallet is meant to represent one (still anonymous) reporter over time.
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    wallet_code: str = Field(unique=True, index=True)
+    phone_hash: str | None = Field(default=None, unique=True, index=True)  # optional, for phone-based lookup
+    points_balance: int = 0
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class RewardOption(SQLModel, table=True):
+    """A catalog entry a wallet's points can be redeemed for. Seeded with
+    illustrative examples (see seed.py) — replace with the org's actual
+    partnerships (airtime aggregator, specific gift card vendors) before any
+    real pilot; nothing here is a real payment integration."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    points_cost: int
+    description: str = ""
+    active: bool = True
+
+
+class RedemptionRequest(SQLModel, table=True):
+    """A wallet spending points on a RewardOption. Points are deducted
+    immediately on request (not on fulfillment) to prevent double-spending
+    the same balance across two pending requests; cancelling refunds them.
+
+    contact_phone is the one deliberate exception to this app's "never store
+    a raw phone number" rule (see Report.reporter_ref) — an actual reward
+    (airtime, a gift card) has to be delivered to someone, which is
+    fundamentally impossible from a one-way hash. Scoped as narrowly as
+    possible: only here, only for active redemptions, never on Report or
+    Wallet itself.
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    wallet_id: int = Field(foreign_key="wallet.id", index=True)
+    reward_option_id: int = Field(foreign_key="rewardoption.id")
+    points_spent: int  # snapshotted at request time, independent of later catalog price changes
+    status: RedemptionStatus = RedemptionStatus.PENDING
+    contact_phone: str  # plaintext by necessity — see docstring above
+    admin_notes: str = ""
+    requested_at: datetime = Field(default_factory=_utcnow)
+    fulfilled_at: datetime | None = None
 
 
 class SmsInbound(SQLModel, table=True):

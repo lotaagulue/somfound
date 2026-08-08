@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Redemptions — Somfound{% endblock %}
+{% block content %}
+<section class="moderate-page">
+  <h1>Reward redemptions</h1>
+  <p class="hint">Fulfillment is manual — use the contact phone to actually send the airtime/gift card, then mark it fulfilled here.</p>
+
+  {% if not redemptions %}
+  <p class="hint">No redemption requests yet.</p>
+  {% endif %}
+
+  {% for r in redemptions %}
+  <article class="report-card">
+    <header>
+      <strong>{{ r.points_spent }} pts</strong> · {{ status_labels[r.status] }}
+      <span class="timestamp">{{ r.requested_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+    </header>
+    <p>Wallet: <strong>{{ wallet_codes[r.wallet_id] }}</strong> · Contact: <strong>{{ r.contact_phone }}</strong></p>
+    {% if r.admin_notes %}<p class="hint">{{ r.admin_notes }}</p>{% endif %}
+    {% if r.status.value == 'pending' %}
+    <form method="post" action="/redemptions/{{ r.id }}/fulfilled" class="inline-form">
+      <input type="text" name="notes" placeholder="Optional notes">
+      <button type="submit" class="btn-approve">Mark fulfilled</button>
+    </form>
+    <form method="post" action="/redemptions/{{ r.id }}/cancelled" class="inline-form">
+      <input type="text" name="notes" placeholder="Reason for cancelling">
+      <button type="submit" class="btn-reject">Cancel (refunds points)</button>
+    </form>
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

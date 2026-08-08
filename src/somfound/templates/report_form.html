@@ -4,7 +4,12 @@
 <section class="form-page">
   <h1>Report something</h1>
   {% if submitted %}
-  <p class="banner banner-success">Thanks — your report was submitted and is waiting for moderator review before it appears on the map.</p>
+  <p class="banner banner-success">
+    Thanks — your report was submitted and is waiting for moderator review before it appears on the map.
+    <br>Your reward wallet code: <strong>{{ wallet_code }}</strong> — save this. Verified reports (especially
+    crime/safety tips) can earn points here, redeemable for airtime or a gift card at
+    <a href="/wallet">/wallet</a>. This code (or the phone number above, if you gave one) is the only way back in.
+  </p>
   {% endif %}
   <p class="hint">No smartphone? Text the same details to our SMS line instead — see the SMS demo section on the map page.</p>
 
@@ -53,6 +58,10 @@
 
     <label>Phone number <span class="optional">(optional — only used if a moderator needs to follow up, never shown publicly)</span>
       <input type="tel" name="phone" placeholder="+234...">
+    </label>
+
+    <label>Reward wallet code <span class="optional">(optional — already have one from a past report? Link this report to it. Otherwise a new one is created for you.)</span>
+      <input type="text" name="wallet_code" placeholder="e.g. K7XQ4M2P">
     </label>
 
     <button type="submit">Submit report</button>

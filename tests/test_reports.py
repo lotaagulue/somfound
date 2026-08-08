@@ -13,9 +13,11 @@ def test_web_report_is_pending_until_approved(client, moderator_auth):
             "lat": "6.15",
             "lon": "6.83",
         },
-        follow_redirects=False,
     )
-    assert submit.status_code == 303
+    # Rendered directly (not a redirect) so a freshly generated wallet code
+    # never travels through a URL — see routers/pages.py.
+    assert submit.status_code == 200
+    assert "reward wallet code" in submit.text
 
     public = client.get("/api/reports").json()
     assert not any("automated test suite" in r["description"] for r in public)
@@ -53,9 +55,8 @@ def test_resolved_report_disappears_from_default_map_but_available_via_toggle(cl
             "lat": "6.15",
             "lon": "6.83",
         },
-        follow_redirects=False,
     )
-    assert submit.status_code == 303
+    assert submit.status_code == 200
 
     queue = client.get("/moderate", auth=moderator_auth)
     report_id = re.findall(r"/moderate/(\d+)/approve", queue.text)[-1]

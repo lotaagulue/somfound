@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}My Wallet — Somfound{% endblock %}
+{% block content %}
+<section class="form-page">
+  <h1>My reward wallet</h1>
+  <p class="hint">
+    Verified reports (especially crime/safety tips a moderator marks reward-worthy) earn points here,
+    redeemable for airtime or a gift card. No login — look yourself up by your wallet code, or the
+    phone number you gave when reporting.
+  </p>
+
+  {% if not wallet %}
+  {% if not_found %}
+  <p class="banner banner-warning">No wallet found for "{{ identifier }}". Double-check your code, or the phone number you used when reporting.</p>
+  {% endif %}
+  <form method="post" action="/wallet">
+    <label>Wallet code or phone number
+      <input type="text" name="identifier" required placeholder="e.g. K7XQ4M2P or +234...">
+    </label>
+    <button type="submit">Look up my wallet</button>
+  </form>
+  {% else %}
+
+  {% if just_redeemed %}
+  <p class="banner banner-success">Redemption requested — we'll be in touch at the phone number you gave to deliver it. Check back here for status.</p>
+  {% endif %}
+
+  <div class="report-card">
+    <header><strong>Wallet {{ wallet.wallet_code }}</strong></header>
+    <p class="hint">Points balance</p>
+    <p style="font-size:2rem;font-weight:800;color:var(--brand-dark);margin:0 0 0.5rem;">{{ wallet.points_balance }}</p>
+  </div>
+
+  <h2>Redeem</h2>
+  {% if not reward_options %}
+  <p class="hint">Nothing in the catalog right now — check back later.</p>
+  {% endif %}
+  {% for option in reward_options %}
+  <article class="report-card">
+    <header>
+      <strong>{{ option.name }}</strong>
+      <span class="timestamp">{{ option.points_cost }} pts</span>
+    </header>
+    <p>{{ option.description }}</p>
+    {% if wallet.points_balance >= option.points_cost %}
+    <form method="post" action="/wallet/{{ wallet.wallet_code }}/redeem" class="inline-form">
+      <input type="hidden" name="reward_option_id" value="{{ option.id }}">
+      <input type="tel" name="contact_phone" placeholder="Phone number to deliver this to" required>
+      <button type="submit">Redeem</button>
+    </form>
+    <p class="hint">Redeeming needs a real phone number so we can actually deliver this — unlike your reports, this contact info isn't anonymous.</p>
+    {% else %}
+    <p class="hint">Need {{ option.points_cost - wallet.points_balance }} more points.</p>
+    {% endif %}
+  </article>
+  {% endfor %}
+
+  {% if redemptions %}
+  <h2>Your redemption history</h2>
+  {% for r in redemptions %}
+  <article class="report-card">
+    <header>
+      <strong>{{ r.points_spent }} pts</strong> · {{ r.status.value|capitalize }}
+      <span class="timestamp">{{ r.requested_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+    </header>
+    {% if r.admin_notes %}<p class="hint">{{ r.admin_notes }}</p>{% endif %}
+  </article>
+  {% endfor %}
+  {% endif %}
+
+  {% endif %}
+</section>
+{% endblock %}

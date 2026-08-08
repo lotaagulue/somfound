@@ -36,12 +36,15 @@ webhook — under `src/somfound/`:
   phone home screen (PWA-lite — no service worker, so no offline support, just the manifest +
   icons). Icons were generated locally with Pillow as a one-off (`uv run --with pillow ...`,
   not a project dependency) — regenerate the same way if the brand mark changes.
-- **`models.py`** — SQLModel tables (`Report`, `LGA`, `SmsInbound`) and the enums/label
-  dicts (`Category`, `Urgency`, `Status`, `SourceChannel`). `CATEGORY_LABELS`/`CATEGORY_ICONS`
-  and `URGENCY_LABELS`/`URGENCY_COLORS` are the single source of truth for how those enums
-  render — routers and templates pull from these rather than hardcoding labels/colors. The
-  location model is LGA-level (Local Government Area — Nigeria's admin unit below state), not
-  individual villages; `LGA.state` is one of the 5 South-East states.
+- **`models.py`** — SQLModel tables (`Report`, `LGA`, `SmsInbound`, plus Phase C's
+  `Resource`, `ReportConfirmation`, `Wallet`, `RewardOption`, `RedemptionRequest`) and the
+  enums/label dicts (`Category`, `Urgency`, `Status`, `SourceChannel`, `ResourceType`,
+  `ResourceStatus`, `RedemptionStatus`). `CATEGORY_LABELS`/`CATEGORY_ICONS` and
+  `URGENCY_LABELS`/`URGENCY_COLORS` (and their `RESOURCE_*` equivalents) are the single source
+  of truth for how those enums render — routers and templates pull from these rather than
+  hardcoding labels/colors. The location model is LGA-level (Local Government Area —
+  Nigeria's admin unit below state), not individual villages; `LGA.state` is one of the 5
+  South-East states.
 - **`sms_parser.py`** — pure function, no I/O: turns freeform SMS text into
   `(category, urgency, description, lga)` via a leading-keyword map, escalation words, and
   LGA-name matching (longest name first, to avoid a shorter name winning a substring
@@ -58,7 +61,14 @@ webhook — under `src/somfound/`:
 
 - **`routers/`** — `pages.py` (public map + report form), `moderation.py` (queue, HTTP Basic
   auth via `auth.py`), `api.py` (JSON feed the map's JS polls), `sms.py` (both the real
-  webhook and `/sms/simulate`, both backed by `sms_service.py`).
+  webhook and `/sms/simulate`, both backed by `sms_service.py`), `resources.py` (Phase C: kit
+  locations — public read, moderator-auth write, no public submission), `wallet.py` (Phase C:
+  reward wallets — public `/wallet` lookup/redeem, moderator-auth `/redemptions` fulfillment
+  queue).
+- **`session.py`** — the anonymous cookie behind Phase C's community confirmations: hashed
+  before storage, deliberately *not* tied to anything identifying (unlike `reporter_ref`,
+  which hashes something the reporter typed) — this hashes a random token the server handed
+  out, so it can't be linked back to a person even in principle.
 - **`main.py`** — assembles the FastAPI app. Notably calls `init_db()` + seeding **at import
   time**, not inside an ASGI lifespan hook — this was deliberate so cold starts on
   serverless hosts (Vercel) that don't reliably run lifespan events still initialize
@@ -75,10 +85,12 @@ webhook — under `src/somfound/`:
   leaves — it only creates *missing* tables, never alters existing ones — by hand-adding any
   columns current models need that an existing (e.g. live Supabase) table doesn't have yet. No
   Alembic yet; additive-only by design (add columns, never drop), since this runs
-  unconditionally on every startup against a real production DB. Currently handles one
-  migration (`Report.village_id` → `Report.lga_id`, from the villages→LGAs rename); add the
-  next one the same way rather than reaching for a migration framework prematurely, but revisit
-  that decision once there are two or three of these.
+  unconditionally on every startup against a real production DB. Four columns handled this way
+  so far (`Report.lga_id`, `.confirmations_count`, `.wallet_id`, `.points_awarded` — each added
+  when its feature shipped, each verified by rebuilding a DB with the actual prior code before
+  touching production, not just reasoned about). That's the pattern to follow for the next one
+  too — revisit reaching for a real migration framework once this list gets much longer, but
+  it's not there yet.
 - **`sms_client.py`** — optional outbound confirmation SMS via Africa's Talking. Their free
   sandbox is deprecated, so this is dormant by default (`AT_API_KEY` unset) and unused by
   the demo; it's there for whenever a real pilot wires up production SMS credentials.
@@ -127,6 +139,24 @@ alone. If you touch `URGENCY_COLORS` in `models.py`, re-validate with
 
 Brand colors (deep blue `#2638c4` / `#1b2999` on warm cream `#faf6f0`, in
 `static/style.css`) come from the org's own pitch deck, not a generic default.
+
+### Phase C (reward wallets, kit locations, confirmations)
+
+Full user-facing description: README §13. The one thing worth internalizing before touching
+`crud.resolve_wallet_for_report()`: **every** report gets a wallet, resolved in priority order
+(explicit wallet code the reporter already has → phone-linked wallet, found-or-created →
+brand-new anonymous wallet). The anonymous case's code is shown exactly once, at submission —
+there's no recovery path if it's lost, by design (same tradeoff as a call-in tip line's
+reference number). That's also why `POST /report` renders the confirmation directly instead of
+redirect-after-post (`routers/pages.py`) — putting a reusable, sensitive code in a redirect's
+query string would leave it sitting in browser history.
+
+`RedemptionRequest.contact_phone` is the one deliberate exception to "never store a raw phone
+number" (see `Report.reporter_ref` elsewhere) — delivering a real reward needs a real contact,
+which is fundamentally impossible from a one-way hash. Scoped as narrowly as possible: only on
+that one table, only for the moment someone's actively redeeming, never on `Report` or
+`Wallet` itself. If you're touching the wallet/redemption code, keep that scope narrow rather
+than let plaintext contact info creep into the report/wallet models.
 
 ## Real-world context
 

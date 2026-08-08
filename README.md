@@ -78,31 +78,43 @@ This is slower than auto-publish, but it matters here specifically because repor
 - **Rate limiting per phone number/session** to blunt spam or coordinated abuse.
 - **Confirmation/upvote counts** from other nearby reporters, as an input moderators can see (not auto-publish trigger) — sets up a future move toward community verification once an LGA has enough active users.
 
-## 5. Data model (draft)
+## 5. Data model (as built, plus what's still draft)
 
 ```text
 Report
   id
-  category            enum: crime_safety | infrastructure | needs_resources | community_dev | other
-  urgency              enum: critical | high | moderate | informational
-  status                enum: pending | published | rejected | resolved
-  title                 short auto/derived summary
-  description           free text
-  location              lat, lon, lga_id (nullable)
-  source_channel        enum: web | sms
-  reporter_ref           hashed phone or anonymous session id (never raw phone in plaintext)
-  media[]                photo URLs (web only, MVP)
-  confirmations_count    int, default 0
+  category               enum: crime_safety | infrastructure | needs_resources | community_dev | other
+  urgency                 enum: critical | high | moderate | informational
+  status                   enum: pending | published | rejected | resolved
+  description               free text
+  location                  lat, lon, lga_id (nullable)
+  source_channel             enum: web | sms
+  reporter_ref                hashed phone or anonymous session id (never raw phone in plaintext)
+  confirmations_count          int, default 0 — see ReportConfirmation
+  wallet_id, points_awarded     see Wallet — §13, Phase C reward system
   created_at, published_at, resolved_at
-  moderator_id, moderation_notes
+  moderator_notes
 
 LGA (Local Government Area — the reporting unit, not individual villages)
   id, name, state, lat, lon
 
+ReportConfirmation (peer confirmation dedup — §13)
+  id, report_id, session_hash, created_at — unique on (report_id, session_hash)
+
+Resource (moderator-managed, e.g. first-aid kit boxes — §13)
+  id, resource_type, status, lga_id, lat, lon, notes, created_at, updated_at
+
+Wallet (anonymous reward points balance — §13)
+  id, wallet_code, phone_hash (nullable), points_balance, created_at
+
+RewardOption / RedemptionRequest (reward catalog + fulfillment — §13)
+  RewardOption: id, name, points_cost, description, active
+  RedemptionRequest: id, wallet_id, reward_option_id, points_spent, status, contact_phone, requested_at, fulfilled_at
+
 SmsInbound (raw audit log)
   id, from_phone_hash, raw_text, parsed_category, parsed_urgency, linked_report_id, received_at
 
-ModerationAction
+ModerationAction (still draft — not built; see PLANNING.md Phase A)
   id, report_id, moderator_id, action, notes, created_at
 ```
 
@@ -124,10 +136,11 @@ One stack, kept deliberately small so the demo runs on **entirely free infrastru
 - ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date — `/`
 - ✅ Moderator queue (approve/reject/resolve) — `/moderate`
 - ✅ Real LGA list (all 95, across Anambra/Abia/Ebonyi/Enugu/Imo) to anchor locations — see §11 for the data source
+- ✅ Community confirmations, first-aid kit locations, reward wallets/redemption — see §13 (Phase C)
 
 Note the distinction from earlier versions of this doc: the *geographic reference data* (which LGAs exist, roughly where) is now real, not a placeholder — what's still undecided is which specific LGA(s) actually get real moderation attention/outreach first (§10).
 
-Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-language (Igbo) UI, native mobile app, analytics dashboard for government/NGO partners, monetization, photo uploads.
+Explicitly **out of scope for MVP**: USSD, multi-language (Igbo) UI, native mobile app, analytics dashboard for government/NGO partners, ₦-denominated membership dues, photo uploads.
 
 ## 8. Key risks & mitigations
 
@@ -139,6 +152,7 @@ Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-
 | Low connectivity / feature phones | SMS is the fallback by design; keep SMS parsing lenient (freeform, not rigid syntax) |
 | Moderator bottleneck / who moderates? | Needs a real answer before pilot launch — local volunteer(s), community leader, or a small rotating team |
 | Sustainability of SMS shortcode cost | Look at NGO, diaspora, or local government partnership to cover ongoing SMS gateway costs |
+| Reward-point abuse (fake wallets/reports farming redemptions) | Moderator explicitly awards points per-report (never automatic), redemption needs a real contact phone (traceable), and there's a fulfillment queue a human reviews before anything ships — no automatic payout |
 | Language barrier | English-first MVP; Igbo keyword support and UI translation is a near-term follow-up, not v0 |
 
 ## 9. Roadmap
@@ -148,9 +162,10 @@ matters, not just what it is.
 
 - ~~**Phase 0:** this spec, pick pilot LGA(s), confirm who moderates.~~ Spec done, app live; pilot LGA(s) and moderator team still open (§10).
 - ~~**Phase 1 (MVP):** web report + map + SMS (simulated) + moderator queue.~~ **Done** — live at the deployed URL, now covering all 5 states / 95 LGAs rather than a single-LGA pilot.
-- **Phase 2 (next):** real SMS gateway (paid shortcode), per-moderator accounts + audit trail, community confirmation/upvotes, resolved-status notifications, photo uploads.
+- ~~**Phase C (feature depth, from the business plan):** reward/points wallet, first-aid kit locations, community confirmations.~~ **Done** — see §13.
+- **Phase 2 (next):** real SMS gateway (paid shortcode), per-moderator accounts + audit trail, resolved-status notifications, photo uploads.
 - **Phase 3:** USSD menu option, Igbo language support, NDPR compliance pass.
-- **Phase 4:** analytics view for government/NGO/diaspora partners, the ₦1,000/year membership-dues model, anonymous tip-reward system (from the org's own business plan).
+- **Phase 4:** analytics view for government/NGO/diaspora partners, the ₦1,000/year membership-dues model, real reward-catalog partnerships (airtime aggregator, gift card vendors) to replace the current illustrative catalog.
 
 ## 10. Open questions
 
@@ -278,3 +293,46 @@ what's synthetic is only the handful of demo report examples.
 [Render](https://dashboard.render.com/) (**New → Blueprint**) instead of Vercel — same free-tier
 tradeoffs (sleeps on idle, non-persistent disk across deploys), same env vars, same Postgres
 upgrade path when needed.
+
+## 13. Phase C: community confirmations, kit locations, reward wallets
+
+The three concrete things the org's business plan describes for this app, beyond the MVP spec above.
+
+### Community confirmations
+
+A **Confirm** button on any published map marker's popup — peer verification ("I can confirm
+this happened/is still true"), separate from moderator approval. One confirmation per
+anonymous browser session per report (a cookie, not a login — see `somfound/session.py`),
+enforced by a real database unique constraint so it survives even a race between two
+near-simultaneous clicks, not just app-layer checking. `GET /api/reports` includes each
+report's `confirmations_count`.
+
+### First-aid kit locations
+
+`/resources` (moderator auth) — add/update first-aid kit box locations and their install
+status (planned / installed / needs restock / damaged). No public submission path;
+installation is the org's own team's job, not something villagers report. `GET /api/resources`
+feeds a toggle-able layer on the public map (on by default), using the same validated
+status-color palette as report urgency.
+
+### Reward wallets
+
+An anonymous points system: verified reports (crime/safety tips especially) can earn points a
+moderator awards on approval, redeemable for real rewards.
+
+- **Every report gets a wallet** — found later by a short human-typeable code (shown once, at
+  submission) or by re-entering the same phone number that created it. No login, no account
+  system.
+- **Moderators award points on approval** (`/moderate`, an amount field alongside
+  approve/reject) — never automatic, so payout always has a human decision behind it.
+- **`/wallet`** — look up a wallet by code or phone, see the points balance, redeem against a
+  seeded reward catalog (`RewardOption` — currently illustrative airtime/gift-card amounts;
+  replace with the org's actual partnerships before a real pilot).
+- **`/redemptions`** (moderator auth) — the fulfillment queue. Redemption fulfillment is
+  manual/out-of-band (deliver the airtime, mark it fulfilled); cancelling a pending redemption
+  refunds the points.
+- **Privacy note:** redeeming requires a real, plaintext contact phone number — the one
+  deliberate exception to this app's "never store a raw phone number" rule (see `Report.reporter_ref`
+  elsewhere). You cannot deliver airtime to a one-way hash. This is scoped as narrowly as
+  possible: only on the `RedemptionRequest` itself, never on `Report` or `Wallet`, and the UI
+  says so explicitly at the point of redemption rather than leaving it as a silent surprise.
