@@ -73,10 +73,10 @@ All reports land in a **moderator review queue** before they're public — nothi
 - Reject (spam, duplicate, unverifiable)
 - Mark **Resolved** later (e.g., water line fixed) so old issues stop looking live
 
-This is slower than auto-publish, but it matters here specifically because reports can include unverified crime allegations about real places and real people — false positives have real consequences. Two features worth planning for from day one even if not built in MVP:
+This is slower than auto-publish, but it matters here specifically because reports can include unverified crime allegations about real places and real people — false positives have real consequences. Two things that started as "worth planning for from day one" are now actually built, not just planned:
 
-- **Rate limiting per phone number/session** to blunt spam or coordinated abuse.
-- **Confirmation/upvote counts** from other nearby reporters, as an input moderators can see (not auto-publish trigger) — sets up a future move toward community verification once an LGA has enough active users.
+- **Rate limiting per phone number/session** to blunt spam or coordinated abuse — SMS blocks a phone number once it has too many reports still pending review; the web form (where a phone number is optional) falls back to the same limit keyed on the submitter's IP when none is given. Both self-reset as moderators clear the queue, rather than being a hard ban.
+- **Confirmation/upvote counts** from other nearby reporters, as an input moderators can see (not an auto-publish trigger) — see §13, Phase C.
 
 ## 5. Data model (as built, plus what's still draft)
 

@@ -4,7 +4,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from somfound.models import (
     LGA,
@@ -28,9 +28,20 @@ from somfound.models import (
 # routinely mistype/misread against each other.
 _WALLET_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
+# Shared spam/abuse guard for both inbound channels (SMS in sms_service.py,
+# web in routers/pages.py): once a reporter (by phone, or by IP for
+# anonymous web submissions — see Report.reporter_ref) has this many reports
+# still sitting in PENDING, further submissions are blocked until a
+# moderator clears some of the backlog. Self-resets as the queue is worked,
+# not a hard ban.
+MAX_PENDING_PER_REPORTER = 3
+
 
 def hash_reporter_contact(raw: str) -> str:
-    """Never store a raw phone number — only a stable, non-reversible hash of it."""
+    """Never store a raw phone number — only a stable, non-reversible hash of it.
+    Also reused to hash a client IP for rate-limiting anonymous web reports
+    (see routers/pages.py) — it's a generic string hasher, nothing here is
+    phone-specific."""
     if not raw:
         return ""
     return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()[:16]
@@ -38,6 +49,16 @@ def hash_reporter_contact(raw: str) -> str:
 
 def list_lgas(session: Session) -> list[LGA]:
     return list(session.exec(select(LGA).order_by(LGA.state, LGA.name)).all())
+
+
+def count_pending_reports(session: Session, reporter_ref: str) -> int:
+    """How many PENDING reports currently exist for this reporter_ref — the
+    basis of the per-reporter rate limit shared by SMS and web."""
+    return session.exec(
+        select(func.count())
+        .select_from(Report)
+        .where(Report.reporter_ref == reporter_ref, Report.status == Status.PENDING)
+    ).one()
 
 
 def create_report(
@@ -52,6 +73,7 @@ def create_report(
     lga_id: int | None = None,
     location_hint: str = "",
     reporter_contact: str = "",
+    reporter_ref: str | None = None,
     wallet_id: int | None = None,
 ) -> Report:
     report = Report(
@@ -64,7 +86,11 @@ def create_report(
         lga_id=lga_id,
         location_hint=location_hint,
         source_channel=source_channel,
-        reporter_ref=hash_reporter_contact(reporter_contact),
+        # Callers that already have a hashed identity (e.g. the web form's
+        # rate-limit key, which may be an IP hash rather than a phone hash)
+        # pass reporter_ref directly; otherwise it's derived from
+        # reporter_contact as before.
+        reporter_ref=reporter_ref if reporter_ref is not None else hash_reporter_contact(reporter_contact),
         wallet_id=wallet_id,
     )
     session.add(report)

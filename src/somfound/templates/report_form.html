@@ -11,6 +11,17 @@
     <a href="/wallet">/wallet</a>. This code (or the phone number above, if you gave one) is the only way back in.
   </p>
   {% endif %}
+  {% if rate_limited %}
+  <p class="banner banner-warning">
+    You have a few reports still waiting for review — please wait for those to be checked before sending more.
+    This clears automatically as moderators work through the queue.
+  </p>
+  {% endif %}
+  {% if description_too_long %}
+  <p class="banner banner-warning">
+    That description is too long (max {{ max_description_length }} characters) — please shorten it and try again.
+  </p>
+  {% endif %}
   <p class="hint">No smartphone? Text the same details to our SMS line instead — <a href="/sms/simulate">try the SMS demo</a>.</p>
   <p id="draft-restored-hint" class="hint" style="display:none">We restored a report you'd started but hadn't sent yet — keep going, or clear the fields to start fresh.</p>
 
@@ -32,7 +43,7 @@
     </label>
 
     <label>What's happening?
-      <textarea name="description" rows="4" required placeholder="Short description — what, where, when"></textarea>
+      <textarea name="description" rows="4" required maxlength="{{ max_description_length }}" placeholder="Short description — what, where, when"></textarea>
     </label>
 
     <label>State

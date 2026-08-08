@@ -66,6 +66,14 @@ webhook — under `src/somfound/`:
   `list_published_reports()` excludes `RESOLVED` by default (`include_resolved=True` to opt
   in) — this used to silently include resolved reports alongside published ones with no visual
   distinction, defeating the entire point of "Resolved," until a user caught it in production.
+  `MAX_PENDING_PER_REPORTER` + `count_pending_reports()` are the shared spam/abuse guard behind
+  both inbound channels: SMS always has a phone number to key on; the web form's phone field is
+  optional, so `routers/pages.py::submit_report` falls back to hashing the submitter's IP
+  (`hash_reporter_contact` doubles as a generic string hasher, not phone-specific) when none is
+  given. `create_report()`'s `reporter_ref` param lets a caller pass that pre-computed key
+  directly instead of re-deriving it from `reporter_contact` — needed for the IP-hash case, since
+  `reporter_contact` is passed separately to `resolve_wallet_for_report()` and stays phone-only
+  there.
 
 - **`routers/`** — `pages.py` (public map + report form), `moderation.py` (queue, HTTP Basic
   auth via `auth.py`), `api.py` (JSON feed the map's JS polls), `sms.py` (both the real

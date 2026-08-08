@@ -97,3 +97,93 @@ def test_sms_rate_limit_stops_after_threshold(client):
     # The 4th (index 3) should have been rate-limited: no new report created.
     fourth = client.post("/sms/inbound", data={"from": "+2348000000002", "text": "HELP spam attempt 4"})
     assert fourth.json()["report_id"] is None
+
+
+def _report_payload(description: str, **overrides) -> dict:
+    data = {
+        "category": "infrastructure",
+        "urgency": "moderate",
+        "description": description,
+        "lat": "6.15",
+        "lon": "6.83",
+    }
+    data.update(overrides)
+    return data
+
+
+def _approve_and_get_id(client, moderator_auth) -> str:
+    """Grab the most-recently-submitted pending report's id (queue is
+    oldest-first) without approving it yet — the caller decides when."""
+    import re
+
+    queue = client.get("/moderate", auth=moderator_auth)
+    return re.findall(r"/moderate/(\d+)/approve", queue.text)[-1]
+
+
+def _approve(client, moderator_auth, report_id: str) -> None:
+    client.post(f"/moderate/{report_id}/approve", data={"notes": ""}, auth=moderator_auth)
+
+
+def test_web_report_rate_limit_stops_anonymous_spam(client, moderator_auth):
+    # No phone given on any of these — all share the same fallback rate-limit
+    # key (a hash of the test client's IP), same as one anonymous spammer.
+    # Left pending (not approved) until the end of the test — the whole
+    # point is proving 3 *simultaneously* pending reports block a 4th.
+    created_ids = []
+    for i in range(3):
+        r = client.post("/report", data=_report_payload(f"anon spam marker {i}"))
+        assert "reward wallet code" in r.text  # each of the first 3 succeeds
+        created_ids.append(_approve_and_get_id(client, moderator_auth))
+
+    fourth = client.post("/report", data=_report_payload("anon spam marker blocked"))
+    assert fourth.status_code == 200
+    assert "still waiting for review" in fourth.text
+    assert "anon spam marker blocked" not in fourth.text  # not actually created
+
+    public = client.get("/api/reports").json()
+    assert not any("anon spam marker blocked" in r["description"] for r in public)
+
+    # Clean up: this test DB is shared across the whole suite (see
+    # conftest.py), so leaving these pending would permanently exhaust the
+    # anonymous-IP bucket for every later test that submits a no-phone
+    # report — approve them now that the assertions above are done.
+    for report_id in created_ids:
+        _approve(client, moderator_auth, report_id)
+
+
+def test_web_report_rate_limit_is_independent_per_phone(client, moderator_auth):
+    # Exhaust the anonymous (no-phone) bucket first — again left pending
+    # until cleanup at the end, for the same reason as above.
+    created_ids = []
+    for i in range(3):
+        r = client.post("/report", data=_report_payload(f"anon bucket filler {i}"))
+        assert "reward wallet code" in r.text
+        created_ids.append(_approve_and_get_id(client, moderator_auth))
+
+    blocked = client.post("/report", data=_report_payload("anon bucket filler blocked"))
+    assert "still waiting for review" in blocked.text
+
+    # A submission WITH a phone number uses a different rate-limit key (the
+    # phone's hash, not the IP's) and should go through even though the
+    # anonymous bucket above is full.
+    with_phone = client.post(
+        "/report", data=_report_payload("phone-keyed marker", phone="+2348055556666")
+    )
+    assert "reward wallet code" in with_phone.text
+    phone_report_id = _approve_and_get_id(client, moderator_auth)
+
+    queue = client.get("/moderate", auth=moderator_auth)
+    assert "phone-keyed marker" in queue.text
+
+    for report_id in [*created_ids, phone_report_id]:
+        _approve(client, moderator_auth, report_id)
+
+
+def test_web_report_description_too_long_is_rejected(client):
+    too_long = "x" * 2001
+    response = client.post("/report", data=_report_payload(too_long))
+    assert response.status_code == 200
+    assert "too long" in response.text
+
+    public = client.get("/api/reports").json()
+    assert not any(r["description"] == too_long for r in public)
