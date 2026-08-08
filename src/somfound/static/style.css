@@ -111,6 +111,13 @@ main { padding: 1.75rem; max-width: 980px; margin: 0 auto; min-height: 70vh; }
 
 .hint { color: var(--ink-faint); font-size: 0.85rem; }
 
+code {
+  background: var(--surface-alt);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -213,6 +220,8 @@ main { padding: 1.75rem; max-width: 980px; margin: 0 auto; min-height: 70vh; }
   font-weight: 600;
 }
 .banner-success { background: #e3f6e3; color: #0d6b0d; border: 1px solid #bfe8bf; }
+.banner-warning { background: #fef3d9; color: #8a5a00; border: 1px solid #f6dfa0; }
+.banner code { background: rgba(0,0,0,0.06); padding: 0.1em 0.35em; border-radius: 4px; }
 
 /* --- Moderation --- */
 

@@ -36,13 +36,17 @@ webhook — under `src/somfound/`:
   render — routers and templates pull from these rather than hardcoding labels/colors.
 - **`sms_parser.py`** — pure function, no I/O: turns freeform SMS text into
   `(category, urgency, description, village)` via a leading-keyword map, escalation words,
-  and village-name matching. Shared by the real webhook and covered directly by
-  `tests/test_sms_parser.py` with no DB/app needed.
+  and village-name matching. Covered directly by `tests/test_sms_parser.py` with no DB/app
+  needed.
+- **`sms_service.py`** — `process_inbound_sms()`: the shared pipeline (parse → per-phone
+  rate limit → create `Report` → log `SmsInbound`) used by both `POST /sms/inbound` (a real
+  webhook, shaped for a future SMS gateway) and `/sms/simulate` (the in-app demo UI). Keep
+  new inbound-SMS behavior here, not duplicated across the two callers.
 - **`crud.py`** — the only place that touches the DB for reads/writes report data; hashes
   reporter phone numbers (`hash_reporter_contact`) so raw numbers are never persisted.
 - **`routers/`** — `pages.py` (public map + report form), `moderation.py` (queue, HTTP Basic
-  auth via `auth.py`), `api.py` (JSON feed the map's JS polls), `sms.py` (inbound webhook,
-  ties `sms_parser` + `crud` + a per-phone rate limit together).
+  auth via `auth.py`), `api.py` (JSON feed the map's JS polls), `sms.py` (both the real
+  webhook and `/sms/simulate`, both backed by `sms_service.py`).
 - **`main.py`** — assembles the FastAPI app. Notably calls `init_db()` + seeding **at import
   time**, not inside an ASGI lifespan hook — this was deliberate so cold starts on
   serverless hosts (Vercel) that don't reliably run lifespan events still initialize
@@ -51,6 +55,9 @@ webhook — under `src/somfound/`:
   since cwd isn't reliable on Vercel.
 - **`db.py`** — picks the SQLite path based on environment: `/tmp` on Vercel (read-only FS
   elsewhere), a local file otherwise. `DATABASE_URL` overrides this for Postgres later.
+- **`sms_client.py`** — optional outbound confirmation SMS via Africa's Talking. Their free
+  sandbox is deprecated, so this is dormant by default (`AT_API_KEY` unset) and unused by
+  the demo; it's there for whenever a real pilot wires up production SMS credentials.
 
 ### Deployment targets
 

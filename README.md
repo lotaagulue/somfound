@@ -113,14 +113,14 @@ One stack, kept deliberately small so the demo runs on **entirely free infrastru
 - **Backend:** FastAPI (Python) — REST API + server-rendered pages for report submission, map queries, moderator actions.
 - **Database:** SQLite via SQLModel — zero-cost, zero-setup, no separate DB service to pay for or manage. `DATABASE_URL` can point at Postgres later with no code changes when this needs a real pilot deployment (PostGIS was the original proposal for real geospatial queries at scale — SQLite is a deliberate demo-stage simplification, fine at this data volume).
 - **Frontend:** Server-rendered Jinja2 pages + Leaflet.js (via CDN) for the map. No JS build step, no Node toolchain, one deployable app.
-- **SMS gateway:** [Africa's Talking](https://africastalking.com/) — inbound SMS hits a webhook (`POST /sms/inbound`) in the FastAPI backend; a keyword parser assigns category/urgency and creates a `pending` Report. Their **sandbox simulator is free** and is what the demo is built/tested against — no telco shortcode purchase needed to prove the pipeline works.
+- **SMS pipeline:** a keyword parser (`sms_parser.py`) assigns category/urgency and creates a `pending` Report, driven through `sms_service.py` by either a real inbound webhook (`POST /sms/inbound`, shaped for [Africa's Talking](https://africastalking.com/)'s callback format) or the in-app **`/sms/simulate`** page. The demo uses the latter — Africa's Talking's free sandbox has been deprecated, so wiring up a real SMS gateway is deliberately deferred to actual pilot deployment (needs a paid shortcode anyway), not required to demo the pipeline today.
 - **Moderator dashboard:** `/moderate`, HTTP Basic auth, same app — no separate admin tool.
 - **Hosting:** [Render](https://render.com)'s free web service tier — see §12.
 
 ## 7. MVP scope (pilot: one LGA in Anambra State)
 
 - ✅ Web report form (no login, GPS or manual pin) — `/report`
-- ✅ SMS report via free-text keyword parsing — `POST /sms/inbound`
+- ✅ SMS report via free-text keyword parsing — `POST /sms/inbound` (real gateway, future) and `/sms/simulate` (in-app demo, no gateway needed)
 - ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date — `/`
 - ✅ Moderator queue (approve/reject/resolve) — `/moderate`
 - ✅ Seed village list to anchor locations (placeholder cluster — see §10)
@@ -172,9 +172,11 @@ Run the test suite: `uv run pytest`.
 
 The database is a local SQLite file (`somfound.db`, gitignored) that's created and seeded automatically on first run — delete it to reset to a clean demo state.
 
-### Testing SMS without a phone or paying for anything
+### Testing SMS without a phone, an SMS gateway, or paying for anything
 
-Simulate an inbound SMS directly against the webhook the same way Africa's Talking's callback would:
+Open **`http://localhost:8000/sms/simulate`** — type a message the way a reporter would text it (e.g. `WATER Umuoji borehole broken 3 days no fix`), submit, and see exactly how it got parsed (category, urgency, matched village, the reply the sender would receive) before it lands in `/moderate` for approval. This is the primary way to demo the SMS half of the app — no telco account, shortcode, or gateway signup needed at all.
+
+For testing the raw webhook shape directly instead (useful when actually wiring up a gateway later):
 
 ```bash
 curl -X POST http://localhost:8000/sms/inbound \
@@ -182,7 +184,7 @@ curl -X POST http://localhost:8000/sms/inbound \
   -d "text=WATER Umuoji borehole broken 3 days no fix"
 ```
 
-That creates a `pending` report, parsed into category `needs_resources` / urgency `high`, matched to the Umuoji village coordinates — visible at `/moderate` for approval. For a closer-to-real test, sign up for Africa's Talking's **free sandbox** (<https://account.africastalking.com/>), point its SMS callback URL at your deployed `/sms/inbound` endpoint, and text their simulator number from their dashboard.
+Wiring `/sms/inbound` to a real SMS provider (Africa's Talking or otherwise) is deliberately deferred to actual pilot deployment — their free sandbox, which this was originally built/tested against, has since been deprecated, and a real gateway needs a paid shortcode anyway. `sms_client.py`/`AT_*` env vars are there for whenever that happens; nothing in the demo depends on them.
 
 ## 12. Deploying for free (Vercel — used for the live interactive demo)
 
@@ -192,8 +194,8 @@ webhook — is served from one deployment. No separate frontend/backend split ne
 
 1. Push this repo to GitHub (already done — <https://github.com/lotaagulue/somfound>).
 2. In the [Vercel dashboard](https://vercel.com/new), **Add New → Project**, import the repo. Vercel should auto-detect the Python runtime from `vercel.json` + `requirements.txt`; no build command changes needed.
-3. Set env vars under Project Settings if you want non-default moderator credentials (`MODERATOR_USERNAME`, `MODERATOR_PASSWORD`) or real SMS confirmations (`AT_USERNAME`, `AT_API_KEY`) — all optional, safe demo defaults otherwise.
-4. Deploy. Point Africa's Talking's sandbox SMS callback at `https://<your-app>.vercel.app/sms/inbound` to demo the SMS pipeline against the live URL.
+3. Set env vars under Project Settings if you want non-default moderator credentials (`MODERATOR_USERNAME`, `MODERATOR_PASSWORD`) or real SMS confirmations from an actual gateway (`AT_USERNAME`, `AT_API_KEY`) — all optional, safe demo defaults otherwise.
+4. Deploy. Demo the SMS pipeline at `https://<your-app>.vercel.app/sms/simulate` — no gateway needed.
 
 **Known limitation:** Vercel's filesystem is read-only except `/tmp`, so `db.py` stores the
 SQLite file there automatically when it detects Vercel's environment. `/tmp` persists only
