@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from somfound.models import Category, Report, SourceChannel, Status, Urgency, Village
+from somfound.models import LGA, Category, Report, SourceChannel, Status, Urgency
 
 
 def hash_reporter_contact(raw: str) -> str:
@@ -15,8 +15,8 @@ def hash_reporter_contact(raw: str) -> str:
     return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()[:16]
 
 
-def list_villages(session: Session) -> list[Village]:
-    return list(session.exec(select(Village).order_by(Village.name)).all())
+def list_lgas(session: Session) -> list[LGA]:
+    return list(session.exec(select(LGA).order_by(LGA.state, LGA.name)).all())
 
 
 def create_report(
@@ -28,7 +28,7 @@ def create_report(
     lat: float,
     lon: float,
     source_channel: SourceChannel,
-    village_id: int | None = None,
+    lga_id: int | None = None,
     location_hint: str = "",
     reporter_contact: str = "",
 ) -> Report:
@@ -39,7 +39,7 @@ def create_report(
         description=description,
         lat=lat,
         lon=lon,
-        village_id=village_id,
+        lga_id=lga_id,
         location_hint=location_hint,
         source_channel=source_channel,
         reporter_ref=hash_reporter_contact(reporter_contact),

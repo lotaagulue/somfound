@@ -24,7 +24,7 @@ def health(session: Session = Depends(get_session)) -> dict:
     Useful when debugging a deploy: hit /api/health before assuming routing
     is broken vs. the app never having started."""
     db_kind = "sqlite" if DATABASE_URL.startswith("sqlite") else "postgresql"
-    return {"status": "ok", "db": db_kind, "villages_seeded": len(crud.list_villages(session))}
+    return {"status": "ok", "db": db_kind, "lgas_seeded": len(crud.list_lgas(session))}
 
 
 @router.get("/reports")

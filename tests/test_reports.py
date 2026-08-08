@@ -43,7 +43,7 @@ def test_web_report_is_pending_until_approved(client, moderator_auth):
 
 def test_sms_inbound_creates_categorized_pending_report(client, moderator_auth):
     response = client.post(
-        "/sms/inbound", data={"from": "+2348000000001", "text": "WATER Umuoji borehole broken pytest marker"}
+        "/sms/inbound", data={"from": "+2348000000001", "text": "WATER Nsukka borehole broken pytest marker"}
     )
     assert response.status_code == 200
     assert response.json()["report_id"] is not None

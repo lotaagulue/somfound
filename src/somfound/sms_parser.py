@@ -1,16 +1,16 @@
 """Freeform-SMS parsing.
 
-Reporters text something like `WATER Umuoji borehole broken 3 days no fix`
+Reporters text something like `WATER Nsukka borehole broken 3 days no fix`
 with no rigid syntax required — the leading keyword (if recognized) sets the
-category/urgency, any known village name mentioned anywhere in the message
-is matched, and a few escalation words ("URGENT", "NOW", ...) bump the
-urgency up a notch. Anything unrecognized still becomes a report — it just
-lands in the queue as `other` / `moderate` for a moderator to reclassify.
+category/urgency, any known LGA name mentioned anywhere in the message is
+matched, and a few escalation words ("URGENT", "NOW", ...) bump the urgency
+up a notch. Anything unrecognized still becomes a report — it just lands in
+the queue as `other` / `moderate` for a moderator to reclassify.
 """
 
 from dataclasses import dataclass
 
-from somfound.models import Category, Urgency, Village
+from somfound.models import LGA, Category, Urgency
 
 KEYWORD_MAP: dict[str, tuple[Category, Urgency]] = {
     "CRIME": (Category.CRIME_SAFETY, Urgency.HIGH),
@@ -43,10 +43,10 @@ class ParsedSms:
     urgency: Urgency
     description: str
     keyword_matched: bool
-    village: Village | None
+    lga: LGA | None
 
 
-def parse_sms(text: str, known_villages: list[Village]) -> ParsedSms:
+def parse_sms(text: str, known_lgas: list[LGA]) -> ParsedSms:
     text = text.strip()
     tokens = text.split()
 
@@ -63,12 +63,19 @@ def parse_sms(text: str, known_villages: list[Village]) -> ParsedSms:
         urgency = _escalate(urgency)
 
     lower_text = text.lower()
-    village = next((v for v in known_villages if v.name.lower() in lower_text), None)
+    # Longest name first — defends against a shorter LGA name that happens to
+    # also be a substring of a longer one grabbing the match instead (no
+    # concrete collision in the current 95, but substring matching earns this
+    # for free, so don't rely on list order being collision-free forever).
+    lga = next(
+        (lga for lga in sorted(known_lgas, key=lambda l: -len(l.name)) if lga.name.lower() in lower_text),
+        None,
+    )
 
     return ParsedSms(
         category=category,
         urgency=urgency,
         description=description,
         keyword_matched=mapping is not None,
-        village=village,
+        lga=lga,
     )

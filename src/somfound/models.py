@@ -75,12 +75,14 @@ URGENCY_COLORS: dict[Urgency, str] = {
 PENDING_COLOR = "#9ca3af"  # grey, used for anything not yet published
 
 
-class Village(SQLModel, table=True):
+class LGA(SQLModel, table=True):
+    """A Local Government Area — the reporting unit (states → LGAs), not
+    individual villages. See seed.py for where the 95 real LGAs across the
+    5 South-East states come from."""
+
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    ward: str = ""
-    lga: str
-    state: str = "Anambra"
+    state: str = Field(index=True)
     lat: float
     lon: float
 
@@ -93,8 +95,8 @@ class Report(SQLModel, table=True):
     description: str
     lat: float
     lon: float
-    village_id: int | None = Field(default=None, foreign_key="village.id")
-    location_hint: str = ""  # free-text place name when no village match (e.g. from SMS)
+    lga_id: int | None = Field(default=None, foreign_key="lga.id")
+    location_hint: str = ""  # free-text place name when no LGA match (e.g. from SMS)
     source_channel: SourceChannel
     reporter_ref: str = ""  # hashed phone / anonymous session id, never raw phone
     moderator_notes: str = ""
