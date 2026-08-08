@@ -30,6 +30,20 @@ app.include_router(api.router)
 app.include_router(sms.router)
 
 
+@app.middleware("http")
+async def _no_edge_cache(request: Request, call_next):
+    """Every page here can change between requests (new reports, moderation
+    decisions) — never let Vercel's (or any) edge cache serve a stale one.
+    This also fixed a real production bug: without an explicit Cache-Control,
+    Vercel's edge was caching responses keyed by the rewrite *destination*
+    rather than the original request path, so every distinct URL served the
+    same frozen response from whichever request happened to populate the
+    cache first."""
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.exception_handler(StarletteHTTPException)
 async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     """Same status code/shape as FastAPI's default, plus the path it actually
