@@ -5,10 +5,16 @@ matching stays the primary, fast, free path for the common case; this only
 kicks in for the natural-language descriptions that don't hit any of the
 ~12 known keywords.
 
-Same dormant-by-default pattern as sms_client.py: if GEMINI_API_KEY isn't
-set, or the call fails/times out/returns something unparseable for any
-reason, this returns None and the caller falls back to the existing
-OTHER/MODERATE default — a Gemini outage, bad key, or free-tier quota
+Two providers, tried in order — Gemini first, then Mistral only if Gemini
+itself couldn't classify (unset, error, timeout, bad response). This is a
+resilience fallback against one provider's outage/quota, not a second
+opinion run in parallel: Mistral never runs if Gemini already returned a
+usable answer.
+
+Same dormant-by-default pattern as sms_client.py at every stage: if neither
+API key is set, or every attempted call fails/times out/returns something
+unparseable, this returns None and the caller falls back to the existing
+OTHER/MODERATE default. A provider outage, bad key, or free-tier quota
 exhaustion must never break report submission, which is the app's actual
 core function.
 """
@@ -17,19 +23,18 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
-from somfound.config import GEMINI_API_KEY, GEMINI_MODEL
+from somfound.config import GEMINI_API_KEY, GEMINI_MODEL, MISTRAL_API_KEY, MISTRAL_MODEL
 from somfound.models import Category, Urgency
 
 logger = logging.getLogger("somfound.llm_classifier")
 
-# Wall-clock budget for the whole call, enforced by us rather than trusted to
-# the SDK's own timeout handling — the SDK's http_options timeout has
-# documented reliability issues (google-genai#911, #1330) and also has a
-# server-side *minimum* of 10s, too slow for a fallback in a request path.
-# Abandoning the future at this point doesn't kill the background thread
-# (Python can't forcibly cancel one), it just stops waiting on it — the
-# ThreadPoolExecutor is shut down with wait=False so *we* don't block on it
-# either.
+# Wall-clock budget per provider, enforced by us rather than trusted to each
+# SDK's own timeout handling — Gemini's http_options timeout has documented
+# reliability issues (google-genai#911, #1330) and also has a server-side
+# *minimum* of 10s, too slow for a fallback in a request path. Abandoning the
+# future at this point doesn't kill the background thread (Python can't
+# forcibly cancel one), it just stops waiting on it — the ThreadPoolExecutor
+# is shut down with wait=False so *we* don't block on it either.
 LLM_TIMEOUT_SECONDS = 6
 
 _CATEGORY_HINTS = {
@@ -70,8 +75,7 @@ def _build_prompt(description: str) -> str:
 def _call_gemini(description: str) -> str:
     """The actual network call — split out so tests can monkeypatch just
     this function instead of needing a real API key or network access.
-    Raises on any failure; the caller (guess_category_urgency_with_llm)
-    handles it."""
+    Raises on any failure; the caller (_classify_with) handles it."""
     # Imported lazily so a missing/broken install of google-genai only ever
     # matters if this code path is actually reached (i.e. a key is set).
     from google import genai
@@ -91,32 +95,75 @@ def _call_gemini(description: str) -> str:
     return response.text
 
 
-def guess_category_urgency_with_llm(description: str) -> tuple[Category, Urgency] | None:
-    """None means "couldn't classify" for any reason (disabled, network
-    error, timeout, bad response) — always safe for the caller to treat the
-    same as "no LLM available" and fall back to the keyword default."""
-    if not GEMINI_API_KEY:
-        return None
+def _call_mistral(description: str) -> str:
+    """Same contract as _call_gemini — split out for the same reason."""
+    from mistralai.client import Mistral
+    from mistralai.client.models.jsonschema import JSONSchema
+    from mistralai.client.models.responseformat import ResponseFormat
 
+    client = Mistral(api_key=MISTRAL_API_KEY)
+    response = client.chat.complete(
+        model=MISTRAL_MODEL,
+        messages=[{"role": "user", "content": _build_prompt(description)}],
+        response_format=ResponseFormat(
+            type="json_schema",
+            json_schema=JSONSchema(name="classification", schema=_RESPONSE_SCHEMA, strict=True),
+        ),
+        temperature=0,
+        max_tokens=200,
+        timeout_ms=LLM_TIMEOUT_SECONDS * 1000,
+    )
+    return response.choices[0].message.content
+
+
+def _run_with_timeout(call, description: str, provider_name: str) -> str | None:
+    """Runs `call(description)` with our own hard wall-clock timeout (see
+    LLM_TIMEOUT_SECONDS' docstring above for why we don't trust either SDK's
+    own timeout handling for this). Returns None on any failure — timeout,
+    network error, API error, anything."""
     executor = ThreadPoolExecutor(max_workers=1)
     try:
-        future = executor.submit(_call_gemini, description)
-        raw = future.result(timeout=LLM_TIMEOUT_SECONDS)
+        future = executor.submit(call, description)
+        return future.result(timeout=LLM_TIMEOUT_SECONDS)
     except FutureTimeoutError:
-        logger.warning("Gemini classification timed out after %ss", LLM_TIMEOUT_SECONDS)
+        logger.warning("%s classification timed out after %ss", provider_name, LLM_TIMEOUT_SECONDS)
         return None
     except Exception:
-        logger.exception("Gemini classification failed")
+        logger.exception("%s classification failed", provider_name)
         return None
     finally:
         executor.shutdown(wait=False)
 
+
+def _parse(raw: str, provider_name: str) -> tuple[Category, Urgency] | None:
+    """Defense in depth — the response_json_schema on both providers should
+    already constrain this, but never trust that blindly."""
     try:
         data = json.loads(raw)
-        category = Category(data["category"])
-        urgency = Urgency(data["urgency"])
+        return Category(data["category"]), Urgency(data["urgency"])
     except Exception:
-        logger.exception("Gemini returned something unparseable: %r", raw)
+        logger.exception("%s returned something unparseable: %r", provider_name, raw)
         return None
 
-    return category, urgency
+
+def guess_category_urgency_with_llm(description: str) -> tuple[Category, Urgency] | None:
+    """None means "couldn't classify" for any reason — always safe for the
+    caller to fall back to the keyword default. Tries Gemini first, then
+    Mistral only if Gemini itself didn't produce a usable answer (not
+    configured, or failed) — a resilience fallback against one provider's
+    outage/quota, never a second opinion on an answer Gemini already gave."""
+    if GEMINI_API_KEY:
+        raw = _run_with_timeout(_call_gemini, description, "Gemini")
+        if raw is not None:
+            result = _parse(raw, "Gemini")
+            if result is not None:
+                return result
+
+    if MISTRAL_API_KEY:
+        raw = _run_with_timeout(_call_mistral, description, "Mistral")
+        if raw is not None:
+            result = _parse(raw, "Mistral")
+            if result is not None:
+                return result
+
+    return None

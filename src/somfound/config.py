@@ -23,3 +23,9 @@ AT_BASE_URL = os.environ.get("AT_BASE_URL", "https://api.africastalking.com")
 # existed. Free-tier key, so this is safe to enable for the demo.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+
+# Mistral — second-tier fallback, tried only if Gemini itself couldn't
+# classify (unset, error, timeout, bad response), not a parallel second
+# opinion. Same "optional, dormant if unset" rule applies.
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
+MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-small-latest")

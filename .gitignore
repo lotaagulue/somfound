@@ -20,3 +20,5 @@ wheels/
 # details and photos of community members/children; not for the public repo.
 SomFound Business Plan.pdf
 
+.vercel
+.env*
