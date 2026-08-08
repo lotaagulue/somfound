@@ -130,7 +130,44 @@ main { padding: 1.75rem; max-width: 980px; margin: 0 auto; min-height: 70vh; }
   border-top: 1px solid var(--border);
 }
 
+.footer-links { margin-top: 0.5rem; }
+
+.footer-admin {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+
 /* --- Map page --- */
+
+.map-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+.map-hero h1 { margin-bottom: 0.3rem; }
+.map-hero .hint { margin: 0; max-width: 46ch; }
+
+.btn-primary-large {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0.75rem 1.4rem;
+  border-radius: 10px;
+  background: var(--brand);
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  box-shadow: 0 2px 6px rgba(38, 56, 196, 0.25);
+  transition: background 0.15s ease;
+}
+.btn-primary-large:hover { background: var(--brand-dark); }
 
 .map-page #map {
   height: 62vh;
@@ -289,6 +326,14 @@ code {
   cursor: pointer;
 }
 .optional { font-weight: 400; color: var(--ink-faint); }
+
+.wallet-code-disclosure summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--brand);
+}
+.wallet-code-disclosure label { margin-top: 0.7rem; }
 
 .banner {
   padding: 0.85rem 1.1rem;

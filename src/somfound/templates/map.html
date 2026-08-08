@@ -5,8 +5,13 @@
 {% endblock %}
 {% block content %}
 <section class="map-page">
-  <h1>What's happening in the community</h1>
-  <p class="hint">Reports from villagers — by web or SMS — after a moderator has reviewed them. Tap a point for details.</p>
+  <div class="map-hero">
+    <div>
+      <h1>What's happening in the community</h1>
+      <p class="hint">Reports from villagers — by web or SMS — shown here after a moderator reviews them. Tap a point for details.</p>
+    </div>
+    <a href="/report" class="btn-primary-large">+ Report something</a>
+  </div>
 
   <div class="filters">
     <label>Category
@@ -38,7 +43,7 @@
       Show resolved (greyed out, hidden by default)
     </label>
     <label class="checkbox-label">
-      <input type="checkbox" id="filter-kits" checked>
+      <input type="checkbox" id="filter-kits">
       Show first-aid kit locations
     </label>
   </div>
@@ -74,7 +79,7 @@
   }).addTo(map);
 
   let markers = L.layerGroup().addTo(map);
-  let kitMarkers = L.layerGroup().addTo(map);
+  let kitMarkers = L.layerGroup(); // off by default — toggled on via the checkbox below
 
   function buildQuery() {
     const params = new URLSearchParams();
