@@ -18,8 +18,10 @@ def test_simulate_submit_creates_pending_report_and_shows_parse_result(client, m
 
 
 def test_simulate_respects_rate_limit(client):
-    for i in range(3):
+    from somfound import crud
+
+    for i in range(crud.MAX_PENDING_PER_REPORTER):
         client.post("/sms/simulate", data={"phone": "+2348088888888", "text": f"HELP spam {i}"})
 
-    limited = client.post("/sms/simulate", data={"phone": "+2348088888888", "text": "HELP spam 4"})
+    limited = client.post("/sms/simulate", data={"phone": "+2348088888888", "text": "HELP spam blocked"})
     assert "Rate-limited" in limited.text
