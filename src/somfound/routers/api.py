@@ -1,6 +1,6 @@
 """JSON endpoints consumed by the map's JS."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlmodel import Session
 
 from somfound import crud
@@ -15,6 +15,7 @@ from somfound.models import (
     Status,
     Urgency,
 )
+from somfound.session import get_session_hash
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -62,6 +63,28 @@ def api_list_reports(
             "lon": r.lon,
             "source_channel": r.source_channel.value,
             "created_at": r.created_at.isoformat(),
+            "confirmations_count": r.confirmations_count,
         }
         for r in reports
     ]
+
+
+@router.post("/reports/{report_id}/confirm")
+def confirm_report(
+    report_id: int,
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Anonymous peer confirmation — "I can confirm this happened/is still
+    true." One per browser per report (see somfound/session.py); no login,
+    no phone number, just enough friction to stop trivial spam-clicking.
+    Only published reports are confirmable — a pending/rejected report isn't
+    public yet, and a resolved one is already de-emphasized on the map."""
+    report = crud.get_report(session, report_id)
+    if report is None or report.status != Status.PUBLISHED:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    session_hash = get_session_hash(request, response)
+    report, was_new = crud.confirm_report(session, report, session_hash=session_hash)
+    return {"confirmations_count": report.confirmations_count, "already_confirmed": not was_new}

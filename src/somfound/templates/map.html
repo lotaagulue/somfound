@@ -101,14 +101,32 @@
         iconSize: [28, 28],
       });
       const marker = L.marker([r.lat, r.lon], { icon });
+      const confirmButton = resolved
+        ? ''
+        : `<br><button class="confirm-btn" onclick="confirmReport(${r.id}, this)">Confirm (${r.confirmations_count})</button>`;
       marker.bindPopup(
         `<strong>${r.category_label}</strong> · ${resolved ? 'Resolved' : r.urgency_label}<br>` +
         `${r.description}<br>` +
-        `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>`
+        `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>` +
+        confirmButton
       );
       markers.addLayer(marker);
     });
   }
+
+  window.confirmReport = async function (id, btn) {
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/reports/${id}/confirm`, { method: 'POST' });
+      const data = await res.json();
+      btn.textContent = data.already_confirmed
+        ? `You already confirmed this (${data.confirmations_count})`
+        : `Confirmed ✓ (${data.confirmations_count})`;
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Confirm — try again';
+    }
+  };
 
   async function loadResources() {
     const res = await fetch('/api/resources');

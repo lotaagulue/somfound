@@ -46,19 +46,24 @@ def _run_additive_migrations() -> None:
     on every startup: a fresh DB already has every column current models
     define, so each check below is a no-op for it.
 
-    Currently: Report.village_id -> Report.lga_id (villages -> LGAs rename).
-    The old `village_id` column and `village` table are left in place rather
-    than dropped — harmless orphaned data on a demo-stage DB, and dropping
-    columns/tables is exactly the kind of irreversible step not worth taking
-    without a real migration tool backing it.
+    Currently:
+    - Report.village_id -> Report.lga_id (villages -> LGAs rename). The old
+      `village_id` column and `village` table are left in place rather than
+      dropped — harmless orphaned data on a demo-stage DB, and dropping
+      columns/tables is exactly the kind of irreversible step not worth
+      taking without a real migration tool backing it.
+    - Report.confirmations_count (Phase C: peer confirmations), default 0
+      so existing rows don't end up NULL.
     """
     inspector = inspect(engine)
     if "report" not in inspector.get_table_names():
         return  # fresh DB — create_all() just built the current schema already
     columns = {c["name"] for c in inspector.get_columns("report")}
-    if "lga_id" not in columns:
-        with engine.begin() as conn:
+    with engine.begin() as conn:
+        if "lga_id" not in columns:
             conn.execute(text("ALTER TABLE report ADD COLUMN lga_id INTEGER"))
+        if "confirmations_count" not in columns:
+            conn.execute(text("ALTER TABLE report ADD COLUMN confirmations_count INTEGER DEFAULT 0"))
 
 
 def init_db() -> None:
