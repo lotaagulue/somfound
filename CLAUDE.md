@@ -54,10 +54,18 @@ webhook — under `src/somfound/`:
 - **`paths.py`** — absolute `STATIC_DIR`/`TEMPLATES_DIR` computed from `__file__`, not cwd,
   since cwd isn't reliable on Vercel.
 - **`db.py`** — picks the SQLite path based on environment: `/tmp` on Vercel (read-only FS
-  elsewhere), a local file otherwise. `DATABASE_URL` overrides this for Postgres later.
+  elsewhere), a local file otherwise. `DATABASE_URL` overrides this — Supabase Postgres is the
+  documented path (README §12); `normalize_database_url()` rewrites the bare `postgres://`
+  scheme Supabase/Heroku hand out to `postgresql://`, which SQLAlchemy requires, and non-SQLite
+  engines get `execution_options={"compiled_cache": None}` because Supabase's Supavisor
+  transaction-mode pooler (the right choice for serverless — see README) doesn't support
+  server-side prepared statements.
 - **`sms_client.py`** — optional outbound confirmation SMS via Africa's Talking. Their free
   sandbox is deprecated, so this is dormant by default (`AT_API_KEY` unset) and unused by
   the demo; it's there for whenever a real pilot wires up production SMS credentials.
+- **`GET /api/health`** — cheap liveness/config check (DB reachable, which backend, village
+  seed count) with no secrets in the response. First thing to hit when a deploy misbehaves,
+  before assuming routing is broken.
 
 ### Deployment targets
 
@@ -69,10 +77,10 @@ beyond what's in `db.py`:
 - **Vercel** (`vercel.json` + `api/index.py`) — single serverless function, all routes
   rewritten to it; SQLite lives in `/tmp` so it persists only within a warm instance.
 
-Both platforms' free tiers reset the demo data on cold start/redeploy — expected, not a bug,
-documented in README §12/§13. A real pilot deployment should swap `DATABASE_URL` for a
-persistent Postgres (Neon's free tier is the natural next step) before it needs to survive
-concurrent users or real data.
+Both platforms' free tiers reset SQLite demo data on cold start/redeploy — expected, not a bug,
+documented in README §12. Fix by pointing `DATABASE_URL` at Supabase's free Postgres (via the
+Supavisor **transaction pooler**, port 6543 — not the direct connection, which serverless can
+exhaust) — see README §12 "Using Supabase for storage" for the exact steps.
 
 ### Design system
 
