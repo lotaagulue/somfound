@@ -1,6 +1,6 @@
 # Somfound
 
-**Somfound** turns word-of-mouth into a shared, visual picture of what's happening on the ground in a community — starting with a pilot in Anambra State, Nigeria. Anyone can report crime/safety concerns, infrastructure issues, community needs (water, medical help, etc.), or positive local news (a new school, a new borehole) — from a smartphone browser or by plain SMS. Reports show up as color-coded points on a live map so villagers, local leaders, and outside partners (NGOs, government, diaspora) get a real-time, place-based view instead of relying on rumor.
+**Somfound** turns word-of-mouth into a shared, visual picture of what's happening on the ground in a community — across South-East Nigeria's 5 states (Anambra, Abia, Ebonyi, Enugu, Imo) and their 95 LGAs. Anyone can report crime/safety concerns, infrastructure issues, community needs (water, medical help, etc.), or positive local news (a new school, a new borehole) — from a smartphone browser or by plain SMS. Reports show up as color-coded points on a live map so residents, local leaders, and outside partners (NGOs, government, diaspora) get a real-time, place-based view instead of relying on rumor.
 
 > This repo is a demo build for an already-operating South-East Nigeria community-development nonprofit — not a from-scratch hypothetical. See [CLAUDE.md](CLAUDE.md) for that context and the technical architecture.
 
@@ -13,22 +13,22 @@ In many Nigerian villages, information about local events — a robbery, a burst
 ### A. Report via web app (smartphone/desktop)
 
 1. Open Somfound in a browser (no login required for MVP — optional phone number for follow-up).
-2. Drop a pin (defaults to GPS location, editable) or pick a known village/ward from a list.
+2. Drop a pin (GPS location) or pick a **state, then LGA** from a list — the location model is LGA-level (Local Government Area), not individual villages, matching how the org's own plans already describe its coverage area.
 3. Choose a category, write a short description, optionally attach a photo.
 4. Submit → goes to moderator queue → published to the map once approved.
 
 ### B. Report via SMS (any phone)
 
 1. Text a short, freeform message to a shortcode, e.g.:
-   `WATER Umuoji borehole broken 3 days no fix`
-   `HELP Nnewi road robbery near market 9pm armed men`
-2. A keyword parser extracts category + location hints from the message.
+   `WATER Nsukka borehole broken 3 days no fix`
+   `HELP Aba North road robbery near market 9pm armed men`
+2. A keyword parser extracts category + an LGA match from the message.
 3. Sender gets an SMS confirmation ("Got it, thanks — under review").
 4. Goes to the same moderator queue as web reports.
 
 ### C. View the map
 
-1. Anyone (no login) sees a map centered on their village/LGA.
+1. Anyone (no login) sees a map of the 5-state region, default-centered on the whole area.
 2. Points are colored by **urgency** and shaped/icon'd by **category** (see §3).
 3. Filter by category, urgency, or time range ("last 7 days").
 4. Tap a point for the report detail: description, photo (if any), time, status (published/resolved).
@@ -76,7 +76,7 @@ All reports land in a **moderator review queue** before they're public — nothi
 This is slower than auto-publish, but it matters here specifically because reports can include unverified crime allegations about real places and real people — false positives have real consequences. Two features worth planning for from day one even if not built in MVP:
 
 - **Rate limiting per phone number/session** to blunt spam or coordinated abuse.
-- **Confirmation/upvote counts** from other nearby reporters, as an input moderators can see (not auto-publish trigger) — sets up a future move toward community verification once a village has enough active users.
+- **Confirmation/upvote counts** from other nearby reporters, as an input moderators can see (not auto-publish trigger) — sets up a future move toward community verification once an LGA has enough active users.
 
 ## 5. Data model (draft)
 
@@ -88,7 +88,7 @@ Report
   status                enum: pending | published | rejected | resolved
   title                 short auto/derived summary
   description           free text
-  location              lat, lon, village_id (nullable), ward, LGA, state
+  location              lat, lon, lga_id (nullable)
   source_channel        enum: web | sms
   reporter_ref           hashed phone or anonymous session id (never raw phone in plaintext)
   media[]                photo URLs (web only, MVP)
@@ -96,8 +96,8 @@ Report
   created_at, published_at, resolved_at
   moderator_id, moderation_notes
 
-Village
-  id, name, ward, LGA, state, lat, lon
+LGA (Local Government Area — the reporting unit, not individual villages)
+  id, name, state, lat, lon
 
 SmsInbound (raw audit log)
   id, from_phone_hash, raw_text, parsed_category, parsed_urgency, linked_report_id, received_at
@@ -117,13 +117,15 @@ One stack, kept deliberately small so the demo runs on **entirely free infrastru
 - **Moderator dashboard:** `/moderate`, HTTP Basic auth, same app — no separate admin tool.
 - **Hosting:** [Render](https://render.com)'s free web service tier — see §12.
 
-## 7. MVP scope (pilot: one LGA in Anambra State)
+## 7. MVP scope (all 5 South-East states / 95 LGAs — real geographic scope from day one)
 
-- ✅ Web report form (no login, GPS or manual pin) — `/report`
+- ✅ Web report form (no login, GPS or state→LGA picker) — `/report`
 - ✅ SMS report via free-text keyword parsing — `POST /sms/inbound` (real gateway, future) and `/sms/simulate` (in-app demo, no gateway needed)
 - ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date — `/`
 - ✅ Moderator queue (approve/reject/resolve) — `/moderate`
-- ✅ Seed village list to anchor locations (placeholder cluster — see §10)
+- ✅ Real LGA list (all 95, across Anambra/Abia/Ebonyi/Enugu/Imo) to anchor locations — see §11 for the data source
+
+Note the distinction from earlier versions of this doc: the *geographic reference data* (which LGAs exist, roughly where) is now real, not a placeholder — what's still undecided is which specific LGA(s) actually get real moderation attention/outreach first (§10).
 
 Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-language (Igbo) UI, native mobile app, analytics dashboard for government/NGO partners, monetization, photo uploads.
 
@@ -141,16 +143,17 @@ Explicitly **out of scope for MVP**: USSD, community upvote/confirmation, multi-
 
 ## 9. Roadmap
 
-- **Phase 0 (now):** this spec, pick pilot LGA/villages, confirm who moderates.
-- **Phase 1 (MVP):** web report + map + SMS inbound + moderator queue, single LGA pilot.
-- **Phase 2:** USSD menu option, community confirmation/upvotes, resolved-status workflows, Igbo language support.
-- **Phase 3:** multi-LGA/state expansion, analytics view for government/NGO partners, funding/monetization model.
+- ~~**Phase 0:** this spec, pick pilot LGA(s), confirm who moderates.~~ Spec done, app live; pilot LGA(s) and moderator team still open (§10).
+- ~~**Phase 1 (MVP):** web report + map + SMS (simulated) + moderator queue.~~ **Done** — live at the deployed URL, now covering all 5 states / 95 LGAs rather than a single-LGA pilot.
+- **Phase 2 (next):** real SMS gateway (paid shortcode), per-moderator accounts + audit trail, community confirmation/upvotes, resolved-status notifications, photo uploads.
+- **Phase 3:** USSD menu option, Igbo language support, NDPR compliance pass.
+- **Phase 4:** analytics view for government/NGO/diaspora partners, the ₦1,000/year membership-dues model, anonymous tip-reward system (from the org's own business plan).
 
 ## 10. Open questions
 
-- Which specific LGA/villages in Anambra State for the pilot, and do we already have contacts there to seed moderation and initial reports? (The seeded demo data uses a placeholder Idemili North cluster — see §11.)
+- Which specific LGA(s) get real moderation attention/outreach first — the app supports all 95 from day one, but a small team can't meaningfully moderate all of them at once. Do we already have contacts in a particular LGA to seed initial reports?
 - Who moderates at launch — and what's the expected report volume they need to handle?
-- Budget for the Africa's Talking shortcode/SMS costs during pilot?
+- Budget for a real SMS gateway (Africa's Talking production or alternative) once past demo stage — needs a paid shortcode.
 - Should web reporters be able to optionally leave a phone number for follow-up (e.g., "water fixed, can you confirm?"), and how is that stored/used?
 
 ## 11. Running the MVP demo locally
@@ -164,7 +167,7 @@ uv run uvicorn somfound.main:app --reload
 
 Then open:
 
-- `http://localhost:8000/` — the public map (seeded with demo reports around a placeholder Anambra village cluster)
+- `http://localhost:8000/` — the public map (seeded with one demo report per state, real coordinates)
 - `http://localhost:8000/report` — submit a web report
 - `http://localhost:8000/moderate` — moderator queue (HTTP Basic auth; defaults to `moderator` / `somfound-demo` — override via `MODERATOR_USERNAME` / `MODERATOR_PASSWORD` env vars before any real deployment)
 
@@ -172,16 +175,27 @@ Run the test suite: `uv run pytest`.
 
 The database is a local SQLite file (`somfound.db`, gitignored) that's created and seeded automatically on first run — delete it to reset to a clean demo state.
 
+### Where the LGA data comes from
+
+`seed.py` seeds all 95 real LGAs across Anambra (21), Abia (17), Ebonyi (13), Enugu (17), and
+Imo (27) — names cross-checked against Wikipedia's per-state LGA lists, coordinates from
+[xosasx/nigerian-local-government-areas](https://github.com/xosasx/nigerian-local-government-areas)
+(Wikidata-derived). That source had seven verifiable errors (two LGAs with lat/lon swapped,
+two pairs of different LGAs sharing identical coordinates, one point six degrees out of range)
+— corrected in `seed.py` using general geographic knowledge, flagged inline, not surveyed.
+Treat all 95 as approximate pending real GPS/survey data, same caveat as the demo report
+content itself.
+
 ### Testing SMS without a phone, an SMS gateway, or paying for anything
 
-Open **`http://localhost:8000/sms/simulate`** — type a message the way a reporter would text it (e.g. `WATER Umuoji borehole broken 3 days no fix`), submit, and see exactly how it got parsed (category, urgency, matched village, the reply the sender would receive) before it lands in `/moderate` for approval. This is the primary way to demo the SMS half of the app — no telco account, shortcode, or gateway signup needed at all.
+Open **`http://localhost:8000/sms/simulate`** — type a message the way a reporter would text it (e.g. `WATER Nsukka borehole broken 3 days no fix`), submit, and see exactly how it got parsed (category, urgency, matched LGA, the reply the sender would receive) before it lands in `/moderate` for approval. This is the primary way to demo the SMS half of the app — no telco account, shortcode, or gateway signup needed at all.
 
 For testing the raw webhook shape directly instead (useful when actually wiring up a gateway later):
 
 ```bash
 curl -X POST http://localhost:8000/sms/inbound \
   -d "from=+2348012345678" \
-  -d "text=WATER Umuoji borehole broken 3 days no fix"
+  -d "text=WATER Nsukka borehole broken 3 days no fix"
 ```
 
 Wiring `/sms/inbound` to a real SMS provider (Africa's Talking or otherwise) is deliberately deferred to actual pilot deployment — their free sandbox, which this was originally built/tested against, has since been deprecated, and a real gateway needs a paid shortcode anyway. `sms_client.py`/`AT_*` env vars are there for whenever that happens; nothing in the demo depends on them.
@@ -251,8 +265,9 @@ One caveat that's already handled in code, not just documentation: Supavisor's t
 doesn't support server-side prepared statements, so `db.py` disables SQLAlchemy's statement
 cache whenever the URL isn't SQLite — if you swap out `db.py`'s engine setup, keep that.
 
-Regardless of host or storage backend, the pilot LGA/village data (§10) will still need
-updating — none of this deploys real village data, only the placeholder seed set (§11).
+Regardless of host or storage backend, which LGA(s) get real moderation/outreach focus (§10)
+is still an open decision — the *geographic* LGA data itself (§11) is real, not a placeholder;
+what's synthetic is only the handful of demo report examples.
 
 ### Alternative: Render
 

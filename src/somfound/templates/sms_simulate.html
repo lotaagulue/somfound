@@ -16,7 +16,7 @@
       Rate-limited: this simulated phone number already has several reports pending review.
     {% else %}
       Parsed as <strong>{{ outcome.category_label }}</strong> · <strong>{{ outcome.urgency_label }}</strong>
-      {% if outcome.village_name %} · matched village: <strong>{{ outcome.village_name }}</strong>{% endif %}
+      {% if outcome.lga_name %} · matched LGA: <strong>{{ outcome.lga_name }}</strong>{% endif %}
       {% if not outcome.keyword_matched %} · no keyword recognized, filed under "Other" for a moderator to reclassify{% endif %}
     {% endif %}
     <br>
@@ -32,12 +32,12 @@
       <input type="text" name="phone" value="{{ submitted_phone or '+2348012345678' }}">
     </label>
     <label>SMS text
-      <textarea name="text" rows="3" required placeholder="WATER Umuoji borehole broken 3 days no fix">{{ submitted_text or '' }}</textarea>
+      <textarea name="text" rows="3" required placeholder="WATER Nsukka borehole broken 3 days no fix">{{ submitted_text or '' }}</textarea>
     </label>
     <p class="hint">
-      Try: <code>WATER Umuoji borehole broken 3 days no fix</code>,
-      <code>CRIME urgent armed men seen near Nkpor market now</code>,
-      <code>SCHOOL new block opened in Ogidi</code>
+      Try: <code>WATER Nsukka borehole broken 3 days no fix</code>,
+      <code>CRIME urgent armed men seen near Aba North market now</code>,
+      <code>SCHOOL new block opened in Owerri Municipal</code>
     </p>
     <button type="submit">Send simulated SMS</button>
   </form>

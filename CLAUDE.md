@@ -36,14 +36,16 @@ webhook — under `src/somfound/`:
   phone home screen (PWA-lite — no service worker, so no offline support, just the manifest +
   icons). Icons were generated locally with Pillow as a one-off (`uv run --with pillow ...`,
   not a project dependency) — regenerate the same way if the brand mark changes.
-- **`models.py`** — SQLModel tables (`Report`, `Village`, `SmsInbound`) and the enums/label
+- **`models.py`** — SQLModel tables (`Report`, `LGA`, `SmsInbound`) and the enums/label
   dicts (`Category`, `Urgency`, `Status`, `SourceChannel`). `CATEGORY_LABELS`/`CATEGORY_ICONS`
   and `URGENCY_LABELS`/`URGENCY_COLORS` are the single source of truth for how those enums
-  render — routers and templates pull from these rather than hardcoding labels/colors.
+  render — routers and templates pull from these rather than hardcoding labels/colors. The
+  location model is LGA-level (Local Government Area — Nigeria's admin unit below state), not
+  individual villages; `LGA.state` is one of the 5 South-East states.
 - **`sms_parser.py`** — pure function, no I/O: turns freeform SMS text into
-  `(category, urgency, description, village)` via a leading-keyword map, escalation words,
-  and village-name matching. Covered directly by `tests/test_sms_parser.py` with no DB/app
-  needed.
+  `(category, urgency, description, lga)` via a leading-keyword map, escalation words, and
+  LGA-name matching (longest name first, to avoid a shorter name winning a substring
+  collision). Covered directly by `tests/test_sms_parser.py` with no DB/app needed.
 - **`sms_service.py`** — `process_inbound_sms()`: the shared pipeline (parse → per-phone
   rate limit → create `Report` → log `SmsInbound`) used by both `POST /sms/inbound` (a real
   webhook, shaped for a future SMS gateway) and `/sms/simulate` (the in-app demo UI). Keep
@@ -65,13 +67,20 @@ webhook — under `src/somfound/`:
   scheme Supabase/Heroku hand out to `postgresql://`, which SQLAlchemy requires, and non-SQLite
   engines get `execution_options={"compiled_cache": None}` because Supabase's Supavisor
   transaction-mode pooler (the right choice for serverless — see README) doesn't support
-  server-side prepared statements.
+  server-side prepared statements. `_run_additive_migrations()` handles the gap `create_all()`
+  leaves — it only creates *missing* tables, never alters existing ones — by hand-adding any
+  columns current models need that an existing (e.g. live Supabase) table doesn't have yet. No
+  Alembic yet; additive-only by design (add columns, never drop), since this runs
+  unconditionally on every startup against a real production DB. Currently handles one
+  migration (`Report.village_id` → `Report.lga_id`, from the villages→LGAs rename); add the
+  next one the same way rather than reaching for a migration framework prematurely, but revisit
+  that decision once there are two or three of these.
 - **`sms_client.py`** — optional outbound confirmation SMS via Africa's Talking. Their free
   sandbox is deprecated, so this is dormant by default (`AT_API_KEY` unset) and unused by
   the demo; it's there for whenever a real pilot wires up production SMS credentials.
-- **`GET /api/health`** — cheap liveness/config check (DB reachable, which backend, village
-  seed count) with no secrets in the response. First thing to hit when a deploy misbehaves,
-  before assuming routing is broken.
+- **`GET /api/health`** — cheap liveness/config check (DB reachable, which backend, LGA seed
+  count) with no secrets in the response. First thing to hit when a deploy misbehaves, before
+  assuming routing is broken.
 - **`vercel_compat.py`** — works around a real, empirically-confirmed Vercel Python-runtime bug:
   requests forwarded through `vercel.json`'s catch-all rewrite arrive with `scope["path"]`
   hardcoded to the function's own address (`/api/index`) for *every* request, not the original
@@ -131,7 +140,8 @@ The org's founder supplied a business-plan PDF with this context; it's intention
 of community members/children — treat that file as reference-only, never as something to
 publish, quote verbatim into commits, or include in generated docs.
 
-Given the org's actual scope is 5 states / 95 LGAs, treat the README's Anambra-only pilot
-and its seeded Idemili North villages as a deliberately small **placeholder** to build and
-demo against — not a claim about where the real pilot will happen. That's still an open
-decision (see README §10).
+The app's location model matches the org's actual scope directly — `seed.py` carries all 95
+real LGAs across the 5 states (see README §11 for the data source and its corrections), not a
+placeholder subset. What's still a placeholder: the handful of demo *reports* (synthetic
+example content, one per state), and which specific LGA(s) get real moderation/outreach focus
+first — that's still an open decision (see README §10), distinct from the geographic data.

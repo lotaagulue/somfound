@@ -7,11 +7,11 @@ def test_simulate_form_renders(client):
 def test_simulate_submit_creates_pending_report_and_shows_parse_result(client, moderator_auth):
     response = client.post(
         "/sms/simulate",
-        data={"phone": "+2348099999999", "text": "WATER Umuoji borehole broken simulate-marker"},
+        data={"phone": "+2348099999999", "text": "WATER Nsukka borehole broken simulate-marker"},
     )
     assert response.status_code == 200
     assert "Needs &amp; Resources" in response.text or "Needs & Resources" in response.text
-    assert "Umuoji" in response.text
+    assert "matched LGA" in response.text and "Nsukka" in response.text
 
     queue = client.get("/moderate", auth=moderator_auth)
     assert "simulate-marker" in queue.text

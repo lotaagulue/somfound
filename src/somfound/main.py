@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from somfound.db import engine, init_db
 from somfound.paths import STATIC_DIR
 from somfound.routers import api, moderation, pages, sms
-from somfound.seed import seed_demo_reports, seed_villages
+from somfound.seed import seed_demo_reports, seed_lgas
 
 
 def _init_and_seed() -> None:
@@ -15,8 +15,8 @@ def _init_and_seed() -> None:
     serverless hosts that don't reliably run ASGI lifespan events)."""
     init_db()
     with Session(engine) as session:
-        villages = seed_villages(session)
-        seed_demo_reports(session, villages)
+        lgas = seed_lgas(session)
+        seed_demo_reports(session, lgas)
 
 
 _init_and_seed()

@@ -18,7 +18,7 @@ class SmsOutcome:
     report_id: int | None
     category: Category
     urgency: Urgency
-    village_name: str | None
+    lga_name: str | None
     keyword_matched: bool
     rate_limited: bool
     reply: str
@@ -33,8 +33,8 @@ class SmsOutcome:
 
 
 def process_inbound_sms(session: Session, *, from_phone: str, text: str) -> SmsOutcome:
-    villages = crud.list_villages(session)
-    parsed = parse_sms(text, villages)
+    lgas = crud.list_lgas(session)
+    parsed = parse_sms(text, lgas)
     reporter_ref = crud.hash_reporter_contact(from_phone)
 
     pending_count = session.exec(
@@ -52,10 +52,10 @@ def process_inbound_sms(session: Session, *, from_phone: str, text: str) -> SmsO
             category=parsed.category,
             urgency=parsed.urgency,
             description=parsed.description,
-            lat=parsed.village.lat if parsed.village else 0.0,
-            lon=parsed.village.lon if parsed.village else 0.0,
-            village_id=parsed.village.id if parsed.village else None,
-            location_hint="" if parsed.village else text,
+            lat=parsed.lga.lat if parsed.lga else 0.0,
+            lon=parsed.lga.lon if parsed.lga else 0.0,
+            lga_id=parsed.lga.id if parsed.lga else None,
+            location_hint="" if parsed.lga else text,
             source_channel=SourceChannel.SMS,
             reporter_contact=from_phone,
         )
@@ -83,7 +83,7 @@ def process_inbound_sms(session: Session, *, from_phone: str, text: str) -> SmsO
         report_id=linked_report_id,
         category=parsed.category,
         urgency=parsed.urgency,
-        village_name=parsed.village.name if parsed.village else None,
+        lga_name=parsed.lga.name if parsed.lga else None,
         keyword_matched=parsed.keyword_matched,
         rate_limited=rate_limited,
         reply=reply,

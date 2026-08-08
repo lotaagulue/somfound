@@ -29,12 +29,18 @@
       <textarea name="description" rows="4" required placeholder="Short description — what, where, when"></textarea>
     </label>
 
-    <label>Nearest village
-      <select name="village_id" id="village-select">
-        <option value="">— pick a village —</option>
-        {% for v in villages %}
-        <option value="{{ v.id }}" data-lat="{{ v.lat }}" data-lon="{{ v.lon }}">{{ v.name }}</option>
+    <label>State
+      <select id="state-select">
+        <option value="">— pick a state —</option>
+        {% for state in states %}
+        <option value="{{ state }}">{{ state }}</option>
         {% endfor %}
+      </select>
+    </label>
+
+    <label>LGA (Local Government Area)
+      <select name="lga_id" id="lga-select" disabled>
+        <option value="">— pick a state first —</option>
       </select>
     </label>
 
@@ -54,13 +60,29 @@
 </section>
 
 <script>
-  const villageSelect = document.getElementById('village-select');
+  const LGAS_BY_STATE = {{ lgas_by_state_json | safe }};
+
+  const stateSelect = document.getElementById('state-select');
+  const lgaSelect = document.getElementById('lga-select');
   const latInput = document.getElementById('lat');
   const lonInput = document.getElementById('lon');
   const status = document.getElementById('location-status');
 
-  villageSelect.addEventListener('change', () => {
-    const opt = villageSelect.selectedOptions[0];
+  stateSelect.addEventListener('change', () => {
+    const lgas = LGAS_BY_STATE[stateSelect.value] || [];
+    if (lgas.length === 0) {
+      lgaSelect.innerHTML = '<option value="">— pick a state first —</option>';
+      lgaSelect.disabled = true;
+      return;
+    }
+    lgaSelect.innerHTML = '<option value="">— pick an LGA —</option>' + lgas
+      .map((l) => `<option value="${l.id}" data-lat="${l.lat}" data-lon="${l.lon}">${l.name}</option>`)
+      .join('');
+    lgaSelect.disabled = false;
+  });
+
+  lgaSelect.addEventListener('change', () => {
+    const opt = lgaSelect.selectedOptions[0];
     if (opt && opt.dataset.lat) {
       latInput.value = opt.dataset.lat;
       lonInput.value = opt.dataset.lon;
@@ -78,17 +100,17 @@
       (pos) => {
         latInput.value = pos.coords.latitude;
         lonInput.value = pos.coords.longitude;
-        villageSelect.value = '';
+        lgaSelect.value = '';
         status.textContent = 'Location captured.';
       },
-      () => { status.textContent = 'Could not get your location — pick a village instead.'; }
+      () => { status.textContent = 'Could not get your location — pick a state and LGA instead.'; }
     );
   });
 
   document.getElementById('report-form').addEventListener('submit', (e) => {
     if (!latInput.value || !lonInput.value) {
       e.preventDefault();
-      alert('Please pick a village or use your current location first.');
+      alert('Please pick a state and LGA, or use your current location first.');
     }
   });
 </script>

@@ -1,5 +1,7 @@
 """Public-facing HTML pages: the map and the web report form."""
 
+import json
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -17,9 +19,22 @@ from somfound.models import (
     Urgency,
 )
 from somfound.paths import TEMPLATES_DIR
+from somfound.seed import STATES
 
 router = APIRouter(tags=["pages"])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+def _lgas_by_state_json(session: Session) -> str:
+    """State -> [{id, name, lat, lon}], for the report form's cascading
+    state/LGA picker. Server-controlled data only (no user input), but still
+    escape `<` so a stray LGA name can't break out of the <script> tag."""
+    grouped: dict[str, list[dict]] = {state: [] for state in STATES}
+    for lga in crud.list_lgas(session):
+        grouped.setdefault(lga.state, []).append(
+            {"id": lga.id, "name": lga.name, "lat": lga.lat, "lon": lga.lon}
+        )
+    return json.dumps(grouped).replace("<", "\\u003c")
 
 
 @router.get("/")
@@ -46,7 +61,8 @@ def report_form(request: Request, submitted: bool = False, session: Session = De
         request,
         "report_form.html",
         {
-            "villages": crud.list_villages(session),
+            "states": STATES,
+            "lgas_by_state_json": _lgas_by_state_json(session),
             "categories": [(c.value, label) for c, label in CATEGORY_LABELS.items()],
             "urgencies": [(u.value, label) for u, label in URGENCY_LABELS.items()],
             "submitted": submitted,
@@ -61,7 +77,7 @@ def submit_report(
     description: str = Form(...),
     lat: float = Form(...),
     lon: float = Form(...),
-    village_id: int | None = Form(None),
+    lga_id: int | None = Form(None),
     phone: str = Form(""),
     session: Session = Depends(get_session),
 ):
@@ -72,7 +88,7 @@ def submit_report(
         description=description,
         lat=lat,
         lon=lon,
-        village_id=village_id,
+        lga_id=lga_id,
         source_channel=SourceChannel.WEB,
         reporter_contact=phone,
     )
