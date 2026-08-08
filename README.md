@@ -194,21 +194,53 @@ webhook — is served from one deployment. No separate frontend/backend split ne
 
 1. Push this repo to GitHub (already done — <https://github.com/lotaagulue/somfound>).
 2. In the [Vercel dashboard](https://vercel.com/new), **Add New → Project**, import the repo. Vercel should auto-detect the Python runtime from `vercel.json` + `requirements.txt`; no build command changes needed.
-3. Set env vars under Project Settings if you want non-default moderator credentials (`MODERATOR_USERNAME`, `MODERATOR_PASSWORD`) or real SMS confirmations from an actual gateway (`AT_USERNAME`, `AT_API_KEY`) — all optional, safe demo defaults otherwise.
+3. **Env vars** (Project Settings → Environment Variables) — none are strictly required (the app runs on SQLite with safe defaults with nothing set), but for anything beyond a quick look:
+   - `DATABASE_URL` — see "Using Supabase for storage" below. Strongly recommended once more than one person will click around, since plain SQLite on Vercel resets on cold starts (see limitation below).
+   - `MODERATOR_USERNAME` / `MODERATOR_PASSWORD` — override the `moderator` / `somfound-demo` defaults before sharing the URL publicly.
+   - `AT_USERNAME` / `AT_API_KEY` — only for a real SMS gateway later; not needed for the demo (`/sms/simulate` needs nothing).
 4. Deploy. Demo the SMS pipeline at `https://<your-app>.vercel.app/sms/simulate` — no gateway needed.
 
-**Known limitation:** Vercel's filesystem is read-only except `/tmp`, so `db.py` stores the
-SQLite file there automatically when it detects Vercel's environment. `/tmp` persists only
-for the lifetime of a *warm* serverless instance — a cold start (first request after idle,
-or a fresh instance under concurrent traffic) gets a freshly reseeded demo DB, and a report
-submitted in one instance may not be visible from a different concurrent instance. Fine, even
-expected, for a single presenter walking through the demo in one sitting; not something to
-rely on for multiple simultaneous users or data that must survive between sessions. If that
-matters before this graduates past demo stage, swap `DATABASE_URL` for a free-tier Postgres
-(e.g. [Neon](https://neon.tech)) — no code changes needed beyond that env var.
+**If the deployed URL returns `{"detail":"Not Found"}`:** that's FastAPI's own 404 — the app
+booted fine, a route just isn't matching. First hit `https://<your-app>.vercel.app/api/health`:
+if that responds, the app and DB are fine and it's specifically the root-path rewrite not
+applying (check Vercel's dashboard → your project → Deployments → latest → **Functions** tab
+confirms `api/index.py` is listed; **Runtime Logs** shows the actual request path; redeploy
+after any `vercel.json` change since it's read at build time). If `/api/health` *also* 404s,
+the function itself isn't being invoked — check the Framework Preset in Project Settings isn't
+overriding `vercel.json`, and that Root Directory is the repo root.
 
-Regardless of host, requesting the pilot LGA/village data (§10) will still need updating —
-none of this deploys real village data, only the placeholder seed set (§11).
+### Known limitation: SQLite resets on Vercel (fix with Supabase)
+
+Vercel's filesystem is read-only except `/tmp`, so `db.py` stores the SQLite file there
+automatically when it detects Vercel's environment. `/tmp` persists only for the lifetime of a
+*warm* serverless instance — a cold start (first request after idle, or a fresh instance under
+concurrent traffic) gets a freshly reseeded demo DB, and a report submitted in one instance may
+not be visible from a different concurrent instance. Fine for a single presenter walking through
+the demo in one sitting; not fine for multiple simultaneous viewers or data that needs to
+survive between sessions — which is most interactive demos. Fix: point `DATABASE_URL` at a real
+Postgres instead.
+
+### Using Supabase for storage
+
+Supabase's free tier gives a real, persistent Postgres — solves the reset problem above with
+one env var, no code changes (`db.py` already branches on `DATABASE_URL`'s scheme).
+
+1. Create a project at [supabase.com](https://supabase.com) (free tier).
+2. Project Settings → Database → Connection string → select **Transaction** mode (the
+   Supavisor pooler, port `6543`) — not the direct connection (port `5432`). Serverless
+   functions open many short-lived connections; the pooler is built for exactly that, and
+   Postgres's direct connection limit is small enough that serverless traffic can exhaust it.
+3. Set that connection string as `DATABASE_URL` in Vercel's Project Settings (and locally in
+   `.env` if you want to develop against it instead of SQLite). See `.env.example` for the
+   exact format.
+4. Redeploy. `/api/health` will report `"db": "postgresql"` once it's picked up.
+
+One caveat that's already handled in code, not just documentation: Supavisor's transaction mode
+doesn't support server-side prepared statements, so `db.py` disables SQLAlchemy's statement
+cache whenever the URL isn't SQLite — if you swap out `db.py`'s engine setup, keep that.
+
+Regardless of host or storage backend, the pilot LGA/village data (§10) will still need
+updating — none of this deploys real village data, only the placeholder seed set (§11).
 
 ### Alternative: Render
 
