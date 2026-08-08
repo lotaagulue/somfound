@@ -43,16 +43,28 @@ Needs decisions from the operator first — these map straight to README §10's 
 
 ## Phase C — Feature depth (from the org's own business plan, not invented)
 
-The business plan describes three concrete things this app is a natural home for:
+**Done.** All three of the business plan's concrete asks are live:
 
-- **Anonymous tip reward system** — the plan explicitly proposes this for the crime hotline.
-  Reports are anonymous today, but there's no reward mechanism at all yet.
-- **First-aid kit box locations** — the plan's other Q1 priority (across all 95 LGAs). Could
-  be a second map layer/category showing installed resource locations, not just incident
-  reports.
-- **Community confirmation/upvotes** — flagged as a v0 simplification when the moderation
-  model was first designed; becomes valuable once an LGA has enough active reporters that
-  peer confirmation is meaningful.
+- **Anonymous tip reward/points system** — every report gets an anonymous `Wallet` (found by a
+  short code, or by re-entering the phone number that created it — no login). A moderator can
+  award points to a wallet when approving a report (crime/safety tips especially). Points
+  redeem against a seeded `RewardOption` catalog (illustrative amounts — replace with the
+  org's real airtime/gift-card partnerships before a real pilot) at `/wallet`; a moderator
+  fulfillment queue lives at `/redemptions`. Redeeming needs a real contact phone (the one
+  deliberate exception to this app's hash-only-phone rule — you can't deliver airtime to a
+  hash) — scoped only to the redemption record itself, never the report or the wallet's
+  earning history.
+- **First-aid kit box locations** — a moderator-managed `Resource` layer (`/resources` to
+  manage, toggle-able on the public map), tracking install status (planned/installed/needs
+  restock/damaged) per location. No public submission — installation is the org's own team's
+  job, matching the business plan.
+- **Community confirmation/upvotes** — a "Confirm" button on published map reports, one per
+  anonymous browser session (cookie-based, no login) per report, enforced by a real DB unique
+  constraint, not just app-layer checking.
+
+Next natural step for all three: real data to replace what's currently illustrative — actual
+reward-catalog partnerships, real kit-box locations once installed, and enough real reporters
+for confirmations to mean something.
 
 ## Phase D — Scale (once the pilot proves out)
 

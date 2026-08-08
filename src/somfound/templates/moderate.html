@@ -19,6 +19,7 @@
     <p class="hint">Coordinates: {{ "%.4f"|format(r.lat) }}, {{ "%.4f"|format(r.lon) }}</p>
     <form method="post" action="/moderate/{{ r.id }}/approve" class="inline-form">
       <input type="text" name="notes" placeholder="Optional moderator notes">
+      <input type="number" name="award_points" min="0" step="10" value="0" placeholder="Reward pts" title="Award points to this reporter's wallet (e.g. a valuable verified crime tip)">
       <button type="submit" class="btn-approve">Approve</button>
     </form>
     <form method="post" action="/moderate/{{ r.id }}/reject" class="inline-form">
@@ -36,6 +37,7 @@
       <span class="timestamp">published {{ r.published_at.strftime('%Y-%m-%d %H:%M UTC') if r.published_at else '' }}</span>
     </header>
     <p>{{ r.description }}</p>
+    <p class="hint">{{ r.confirmations_count }} peer confirmation(s){% if r.points_awarded %} · {{ r.points_awarded }} pts awarded{% endif %}</p>
     <form method="post" action="/moderate/{{ r.id }}/resolve" class="inline-form">
       <button type="submit" class="btn-resolve">Mark resolved</button>
     </form>

@@ -45,6 +45,7 @@ def moderate_action(
     report_id: int,
     action: str,
     notes: str = Form(""),
+    award_points: int = Form(0),
     session: Session = Depends(get_session),
     _moderator: str = Depends(require_moderator),
 ):
@@ -54,5 +55,5 @@ def moderate_action(
     if action not in {"approve", "reject", "resolve"}:
         raise HTTPException(status_code=400, detail="Unknown action")
 
-    crud.moderate_report(session, report, action=action, notes=notes)
+    crud.moderate_report(session, report, action=action, notes=notes, award_points=award_points)
     return RedirectResponse(url="/moderate", status_code=303)

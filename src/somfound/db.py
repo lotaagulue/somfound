@@ -54,6 +54,12 @@ def _run_additive_migrations() -> None:
       taking without a real migration tool backing it.
     - Report.confirmations_count (Phase C: peer confirmations), default 0
       so existing rows don't end up NULL.
+    - Report.wallet_id, Report.points_awarded (Phase C: reward wallets).
+      create_all() already created the new `wallet` table by the time this
+      runs, but these are added as plain nullable/defaulted columns with no
+      DB-level FK constraint (consistent with lga_id above) — an old report
+      predating this feature just has wallet_id=NULL, points_awarded=0,
+      which is exactly correct: it never had a wallet to award points to.
     """
     inspector = inspect(engine)
     if "report" not in inspector.get_table_names():
@@ -64,6 +70,10 @@ def _run_additive_migrations() -> None:
             conn.execute(text("ALTER TABLE report ADD COLUMN lga_id INTEGER"))
         if "confirmations_count" not in columns:
             conn.execute(text("ALTER TABLE report ADD COLUMN confirmations_count INTEGER DEFAULT 0"))
+        if "wallet_id" not in columns:
+            conn.execute(text("ALTER TABLE report ADD COLUMN wallet_id INTEGER"))
+        if "points_awarded" not in columns:
+            conn.execute(text("ALTER TABLE report ADD COLUMN points_awarded INTEGER DEFAULT 0"))
 
 
 def init_db() -> None:

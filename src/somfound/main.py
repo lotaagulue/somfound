@@ -6,8 +6,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from somfound.db import engine, init_db
 from somfound.paths import STATIC_DIR
-from somfound.routers import api, moderation, pages, resources, sms
-from somfound.seed import seed_demo_reports, seed_lgas
+from somfound.routers import api, moderation, pages, resources, sms, wallet
+from somfound.seed import seed_demo_reports, seed_lgas, seed_reward_catalog
 
 
 def _init_and_seed() -> None:
@@ -17,6 +17,7 @@ def _init_and_seed() -> None:
     with Session(engine) as session:
         lgas = seed_lgas(session)
         seed_demo_reports(session, lgas)
+        seed_reward_catalog(session)
 
 
 _init_and_seed()
@@ -27,6 +28,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(pages.router)
 app.include_router(moderation.router)
 app.include_router(resources.router)
+app.include_router(wallet.router)
 app.include_router(api.router)
 app.include_router(sms.router)
 

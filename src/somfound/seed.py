@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from somfound.models import LGA, Category, Report, SourceChannel, Status, Urgency
+from somfound.models import LGA, Category, Report, RewardOption, SourceChannel, Status, Urgency
 
 STATES = ["Anambra", "Abia", "Ebonyi", "Enugu", "Imo"]
 
@@ -218,4 +218,22 @@ def seed_demo_reports(session: Session, lgas: list[LGA]) -> None:
         )
         session.add(report)
 
+    session.commit()
+
+
+# Illustrative only — replace with the org's actual partnerships (an airtime
+# aggregator, specific gift card vendors) before any real pilot. Nothing
+# here is a real payment integration; redemption fulfillment is manual.
+REWARD_CATALOG = [
+    {"name": "₦500 Airtime", "points_cost": 500, "description": "MTN, Glo, Airtel, or 9mobile — specify network when redeeming."},
+    {"name": "₦1,000 Airtime", "points_cost": 1000, "description": "MTN, Glo, Airtel, or 9mobile — specify network when redeeming."},
+    {"name": "₦2,000 Gift Card", "points_cost": 2000, "description": "Placeholder — real vendor (Jumia, Konga, etc.) TBD."},
+]
+
+
+def seed_reward_catalog(session: Session) -> None:
+    existing = session.exec(select(RewardOption)).first()
+    if existing:
+        return
+    session.add_all(RewardOption(**data) for data in REWARD_CATALOG)
     session.commit()

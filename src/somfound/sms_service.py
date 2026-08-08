@@ -47,6 +47,10 @@ def process_inbound_sms(session: Session, *, from_phone: str, text: str) -> SmsO
     linked_report_id = None
 
     if not rate_limited:
+        # SMS always has a phone number, so this always resolves to a
+        # phone-linked wallet — no separate wallet code to remember, the
+        # same phone number always gets back into the same wallet.
+        wallet = crud.get_or_create_wallet_by_phone(session, reporter_ref)
         report = crud.create_report(
             session,
             category=parsed.category,
@@ -58,13 +62,15 @@ def process_inbound_sms(session: Session, *, from_phone: str, text: str) -> SmsO
             location_hint="" if parsed.lga else text,
             source_channel=SourceChannel.SMS,
             reporter_contact=from_phone,
+            wallet_id=wallet.id,
         )
         linked_report_id = report.id
-        reply = (
+        base_reply = (
             "Got it, thanks — under review."
             if parsed.keyword_matched
             else "Got it, thanks — a moderator will review and categorize this shortly."
         )
+        reply = f"{base_reply} Verified reports can earn reward points — check yours at /wallet with this phone number."
     else:
         reply = "You have several reports pending review already — please wait before sending more."
 
