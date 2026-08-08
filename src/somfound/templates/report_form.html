@@ -13,6 +13,10 @@
     <br>Your reward wallet code: <strong>{{ wallet_code }}</strong> — save this. Verified reports (especially
     crime/safety tips) can earn points here, redeemable for airtime or a gift card at
     <a href="/wallet">/wallet</a>. This code (or the phone number above, if you gave one) is the only way back in.
+    {% if not gave_phone %}
+    <br><strong>Tip:</strong> next time, add a phone number — then you can always get back into your wallet at
+    <a href="/wallet">/wallet</a> just by typing that same number in, no code to save at all.
+    {% endif %}
   </p>
   {% endif %}
   {% if rate_limited %}
@@ -76,7 +80,9 @@
     <input type="hidden" name="lat" id="lat">
     <input type="hidden" name="lon" id="lon">
 
-    <label>Phone number <span class="optional">(optional — only used if a moderator needs to follow up, never shown publicly)</span>
+    <label>Phone number <span class="optional">(optional — never shown publicly. Also the easiest way back into your
+      reward wallet later: give it once, and you can look your wallet up at <a href="/wallet">/wallet</a> any time
+      just by typing the same number again — no code to save, no sign-in.)</span>
       <input type="tel" name="phone" placeholder="+234...">
     </label>
 
@@ -87,7 +93,8 @@
       </label>
     </details>
 
-    <button type="submit">Submit report</button>
+    <input type="hidden" name="submission_token" value="{{ submission_token }}">
+    <button type="submit" id="submit-report-btn">Submit report</button>
   </form>
 </section>
 
@@ -143,7 +150,14 @@
     if (!latInput.value || !lonInput.value) {
       e.preventDefault();
       alert('Please pick a state and LGA, or use your current location first.');
+      return;
     }
+    // Belt-and-suspenders against a double-tap firing two submissions before
+    // the page navigates away — the server-side submission_token check (see
+    // routers/pages.py) is what actually matters (it also covers the
+    // browser-"back"-resubmission case this can't), but this avoids the
+    // double network request in the common case too.
+    document.getElementById('submit-report-btn').disabled = true;
   });
 
   // Draft autosave: a rural/mobile connection can drop mid-fill, and losing

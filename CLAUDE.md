@@ -107,11 +107,12 @@ webhook — under `src/somfound/`:
   leaves — it only creates *missing* tables, never alters existing ones — by hand-adding any
   columns current models need that an existing (e.g. live Supabase) table doesn't have yet. No
   Alembic yet; additive-only by design (add columns, never drop), since this runs
-  unconditionally on every startup against a real production DB. Four columns handled this way
-  so far (`Report.lga_id`, `.confirmations_count`, `.wallet_id`, `.points_awarded` — each added
-  when its feature shipped, each verified by rebuilding a DB with the actual prior code before
-  touching production, not just reasoned about). That's the pattern to follow for the next one
-  too — revisit reaching for a real migration framework once this list gets much longer, but
+  unconditionally on every startup against a real production DB. Five columns handled this way
+  so far (`Report.lga_id`, `.confirmations_count`, `.wallet_id`, `.points_awarded`,
+  `.submission_token` — each added when its feature shipped, each verified by rebuilding a DB
+  with the actual prior code before touching production, not just reasoned about). That's the
+  pattern to follow for the next one too — revisit reaching for a real migration framework once
+  this list gets much longer, but
   it's not there yet.
 - **`sms_client.py`** — optional outbound confirmation SMS via Africa's Talking. Their free
   sandbox is deprecated, so this is dormant by default (`AT_API_KEY` unset) and unused by
@@ -169,9 +170,23 @@ Full user-facing description: README §13. The one thing worth internalizing bef
 (explicit wallet code the reporter already has → phone-linked wallet, found-or-created →
 brand-new anonymous wallet). The anonymous case's code is shown exactly once, at submission —
 there's no recovery path if it's lost, by design (same tradeoff as a call-in tip line's
-reference number). That's also why `POST /report` renders the confirmation directly instead of
-redirect-after-post (`routers/pages.py`) — putting a reusable, sensitive code in a redirect's
-query string would leave it sitting in browser history.
+reference number). Encouraging a phone number instead (report_form.html's phone field and the
+post-submission "Tip:" banner) is the actual answer for "I don't want to have to save a code" —
+`find_wallet()` already looks a wallet up by phone, no code needed, which an IP- or
+device-fingerprint-based scheme was explicitly considered and rejected for: Nigerian mobile
+carriers share IPs across many customers via CGNAT, so an IP-keyed wallet would leak one
+person's points to everyone else behind the same IP, and fingerprinting is the opposite of this
+app's whole hash-only-what-was-explicitly-given identity model.
+
+That's also why `POST /report` renders the confirmation directly instead of redirect-after-post
+(`routers/pages.py`) — putting a reusable, sensitive code in a redirect's query string would
+leave it sitting in browser history. The real cost of that choice: a browser can resubmit that
+POST (hitting "back" past the page's `no-store` header, or a double-tap), and without a guard
+that would silently mint a *second*, orphaned anonymous wallet with a different code — a real
+bug a user actually hit. Fixed with `Report.submission_token`: a random value minted on every
+`GET /report` and echoed back as a hidden field; `POST /report` checks for an existing report
+with that exact token *before* doing anything else (before rate-limiting, before validation) and
+if found, just replays that report's original confirmation instead of creating anything new.
 
 `RedemptionRequest.contact_phone` is the one deliberate exception to "never store a raw phone
 number" (see `Report.reporter_ref` elsewhere) — delivering a real reward needs a real contact,

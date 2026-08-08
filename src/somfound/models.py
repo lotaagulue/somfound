@@ -104,6 +104,13 @@ class Report(SQLModel, table=True):
     confirmations_count: int = 0  # peer confirmations from other reporters — see ReportConfirmation
     wallet_id: int | None = Field(default=None, foreign_key="wallet.id")
     points_awarded: int = 0  # set once, when a moderator approves — see Wallet
+    # A random token minted when the web report form loads and echoed back on
+    # submit — lets routers/pages.py detect a browser resubmitting the exact
+    # same POST (e.g. hitting "back" past a no-store page and resending) and
+    # replay the original confirmation instead of silently minting a second,
+    # orphaned anonymous wallet. Blank for SMS/anything that isn't the web
+    # form's own submit flow.
+    submission_token: str = ""
     created_at: datetime = Field(default_factory=_utcnow)
     published_at: datetime | None = None
     resolved_at: datetime | None = None
