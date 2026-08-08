@@ -22,12 +22,17 @@
 
 * { box-sizing: border-box; }
 
+html { -webkit-text-size-adjust: 100%; }
+
 body {
   margin: 0;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--ink);
   line-height: 1.5;
+  /* Explicit, not just "browser default" — inputs inherit this, and staying
+     at/above 16px stops iOS Safari auto-zooming the page on input focus. */
+  font-size: 16px;
 }
 
 h1, h2 {
@@ -38,6 +43,7 @@ h1, h2 {
 a { color: var(--brand); }
 
 .topbar {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -73,7 +79,48 @@ a { color: var(--brand); }
   border-bottom-color: var(--brand);
 }
 
+/* Hamburger menu, phone-width only — CSS-only via the checkbox hack, no JS. */
+.nav-toggle-checkbox { display: none; }
+.nav-toggle-label {
+  display: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--brand-dark);
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+}
+
 main { padding: 1.75rem; max-width: 980px; margin: 0 auto; min-height: 70vh; }
+
+@media (max-width: 640px) {
+  .nav-toggle-label { display: inline-flex; align-items: center; }
+
+  .topbar nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.25rem 1.5rem 1rem;
+    box-shadow: 0 4px 8px rgba(28, 31, 46, 0.08);
+    z-index: 10;
+  }
+
+  .nav-toggle-checkbox:checked ~ nav { display: flex; }
+
+  .topbar nav a {
+    margin-left: 0;
+    padding: 0.75rem 0;
+    font-size: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar nav a:last-child { border-bottom: none; }
+
+  main { padding: 1.25rem; }
+}
 
 .footer {
   padding: 1.5rem;
@@ -87,6 +134,7 @@ main { padding: 1.75rem; max-width: 980px; margin: 0 auto; min-height: 70vh; }
 
 .map-page #map {
   height: 62vh;
+  min-height: 320px;
   border-radius: 12px;
   border: 1px solid var(--border);
   box-shadow: 0 1px 3px rgba(28, 31, 46, 0.06);
@@ -94,11 +142,14 @@ main { padding: 1.75rem; max-width: 980px; margin: 0 auto; min-height: 70vh; }
 
 .filters {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem 1.5rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
   align-items: flex-end;
 }
+
+.filters label { flex: 1 1 140px; }
+.filters select { width: 100%; }
 
 .filters label, .form-page label {
   display: flex;
@@ -116,6 +167,7 @@ code {
   padding: 0.1em 0.4em;
   border-radius: 4px;
   font-size: 0.9em;
+  word-break: break-word;
 }
 
 .legend {
@@ -175,13 +227,14 @@ code {
   box-shadow: 0 1px 3px rgba(28, 31, 46, 0.06);
 }
 
-.form-page select, .form-page textarea, .form-page input {
+.form-page select, .form-page textarea, .form-page input, .filters select {
   padding: 0.6rem 0.7rem;
   border-radius: 8px;
   border: 1px solid var(--border);
   font: inherit;
   color: var(--ink);
-  background: var(--bg);
+  background: var(--surface);
+  min-height: 44px; /* comfortable tap target on touch devices */
 }
 
 .form-page select:focus, .form-page textarea:focus, .form-page input:focus {
@@ -191,6 +244,7 @@ code {
 
 .form-page button, .inline-form button {
   padding: 0.65rem 1.1rem;
+  min-height: 44px;
   border: none;
   border-radius: 8px;
   background: var(--brand);
@@ -201,9 +255,10 @@ code {
 }
 .form-page button:hover, .inline-form button:hover { background: var(--brand-dark); }
 
-.location-row { display: flex; align-items: center; gap: 0.75rem; }
+.location-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .location-row button {
   padding: 0.5rem 0.9rem;
+  min-height: 44px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface-alt);
@@ -263,3 +318,22 @@ code {
 .btn-reject:hover { background: #a92e2e; }
 .btn-resolve { background: var(--ink-muted); }
 .btn-resolve:hover { background: var(--ink); }
+
+/* --- Phone-width layout --- */
+
+@media (max-width: 640px) {
+  .brand-mark { font-size: 1.15rem; }
+
+  .form-page form { padding: 1.25rem; gap: 1rem; }
+
+  .legend { flex-direction: column; gap: 0.75rem; padding: 0.85rem 1rem; }
+
+  .inline-form {
+    display: flex;
+    width: 100%;
+    margin-right: 0;
+  }
+  .inline-form input { flex: 1; min-width: 0; }
+
+  .report-card header { flex-direction: column; gap: 0.15rem; }
+}
