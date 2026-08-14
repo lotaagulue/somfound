@@ -37,7 +37,7 @@ In many Nigerian villages, information about local events — a robbery, a burst
 1. Anyone (no login) sees a map of the 5-state region, default-centered on the whole area.
 2. Points are colored by **urgency** and shaped/icon'd by **category** (see §3).
 3. Filter by category, urgency, or time range ("last 7 days"). Resolved reports are hidden by default — that's the point of marking something resolved — with an opt-in toggle to see them anyway, greyed out.
-4. Tap a point for the report detail: description, photo (if any), time, status (published/resolved).
+4. Tap a point for the report detail: description, photo (if any), time, status (published/resolved). Longer descriptions get a short AI-generated summary shown up front instead, with a "see full details" toggle for the original — same optional Gemini/Mistral setup as the form's auto-categorization, generated once when a moderator approves the report, not on every map load.
 
 ## 3. Report taxonomy
 
@@ -99,6 +99,7 @@ Report
   confirmations_count          int, default 0 — see ReportConfirmation
   wallet_id, points_awarded     see Wallet — §13, Phase C reward system
   submission_token              web-form resubmission guard, blank for SMS — see CLAUDE.md
+  summary                        optional AI-generated map-popup summary, blank if skipped — see CLAUDE.md
   created_at, published_at, resolved_at
   moderator_notes
 
@@ -140,7 +141,7 @@ One stack, kept deliberately small so the demo runs on **entirely free infrastru
 
 - ✅ Web report form (no login, state→LGA picker, category/urgency auto-detected from the description via keyword matching with an optional Gemini/Mistral LLM fallback and a manual-override option) — `/report`
 - ✅ SMS report via free-text keyword parsing — `POST /sms/inbound` (real gateway, future) and `/sms/simulate` (in-app demo, no gateway needed)
-- ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date — `/`
+- ✅ Public map with the 5 categories / 4 urgency colors, filterable by category/urgency/date, long reports get an optional AI summary with a "see full details" toggle — `/`
 - ✅ Moderator queue (approve/reject/resolve) — `/moderate`
 - ✅ Real LGA list (all 95, across Anambra/Abia/Ebonyi/Enugu/Imo) to anchor locations — see §11 for the data source
 - ✅ Community confirmations, first-aid kit locations, reward wallets/redemption — see §13 (Phase C)

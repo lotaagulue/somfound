@@ -289,6 +289,14 @@ code {
   margin: 0.5rem 0;
 }
 
+.popup-details { margin-top: 0.3rem; }
+.popup-details summary {
+  cursor: pointer;
+  color: var(--brand);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .confirm-btn {
   margin-top: 0.4rem;
   padding: 0.3rem 0.6rem;

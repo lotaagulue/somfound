@@ -111,6 +111,14 @@ class Report(SQLModel, table=True):
     # orphaned anonymous wallet. Blank for SMS/anything that isn't the web
     # form's own submit flow.
     submission_token: str = ""
+    # A short AI-generated summary of `description`, for a scannable map
+    # popup with "see full details" for the original — generated once, at
+    # moderator-approval time (see routers/moderation.py), not on every map
+    # load. Blank if summarization was skipped (description already short,
+    # neither LLM provider configured, or every attempted call failed) — the
+    # map always falls back to showing the full description when this is
+    # empty, so a missing summary is never a missing report.
+    summary: str = ""
     created_at: datetime = Field(default_factory=_utcnow)
     published_at: datetime | None = None
     resolved_at: datetime | None = None

@@ -64,6 +64,9 @@ def _run_additive_migrations() -> None:
       report form — see models.py's docstring on the field), default '' so
       existing rows (which never had a token to begin with) just aren't
       replay-matchable, which is correct: nothing to replay.
+    - Report.summary (AI-generated map-popup summary — see models.py's
+      docstring on the field), default '' so existing rows just show their
+      full description on the map, same as before this existed.
     """
     inspector = inspect(engine)
     if "report" not in inspector.get_table_names():
@@ -80,6 +83,8 @@ def _run_additive_migrations() -> None:
             conn.execute(text("ALTER TABLE report ADD COLUMN points_awarded INTEGER DEFAULT 0"))
         if "submission_token" not in columns:
             conn.execute(text("ALTER TABLE report ADD COLUMN submission_token VARCHAR DEFAULT ''"))
+        if "summary" not in columns:
+            conn.execute(text("ALTER TABLE report ADD COLUMN summary VARCHAR DEFAULT ''"))
 
 
 def init_db() -> None:
