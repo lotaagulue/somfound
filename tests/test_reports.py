@@ -1,6 +1,6 @@
 from somfound import crud
 from somfound.models import Category, Urgency
-from somfound.routers import pages
+from somfound.routers import moderation, pages
 
 
 def test_moderation_queue_requires_auth(client):
@@ -373,3 +373,58 @@ def test_report_form_shows_ai_note_when_a_provider_is_configured(client, monkeyp
     monkeypatch.setattr(pages, "describe_configured_providers", lambda: note)
     response = client.get("/report")
     assert "Test Model" in response.text
+
+
+# --- AI map-popup summary (llm_classifier.summarize_description, wired
+# through routers/moderation.py on approve, exposed via /api/reports) ---
+
+
+def test_approving_calls_summarize_description_and_stores_result(client, moderator_auth, monkeypatch):
+    monkeypatch.setattr(moderation, "summarize_description", lambda description: "A short AI summary.")
+
+    response = client.post("/report", data=_report_payload("summary-storage-marker"))
+    assert response.status_code == 200
+
+    report_id = _approve_and_get_id(client, moderator_auth)
+    _approve(client, moderator_auth, report_id)
+
+    public = client.get("/api/reports").json()
+    match = next(r for r in public if r["description"] == "summary-storage-marker")
+    assert match["summary"] == "A short AI summary."
+
+
+def test_summary_is_empty_string_when_summarize_description_returns_none(client, moderator_auth, monkeypatch):
+    monkeypatch.setattr(moderation, "summarize_description", lambda description: None)
+
+    response = client.post("/report", data=_report_payload("no-summary-marker"))
+    assert response.status_code == 200
+
+    report_id = _approve_and_get_id(client, moderator_auth)
+    _approve(client, moderator_auth, report_id)
+
+    public = client.get("/api/reports").json()
+    match = next(r for r in public if r["description"] == "no-summary-marker")
+    assert match["summary"] == ""
+
+
+def test_summarize_description_not_called_on_reject_or_resolve(client, moderator_auth, monkeypatch):
+    def _should_not_be_called(description):
+        raise AssertionError("summarize_description should only run on approve")
+
+    monkeypatch.setattr(moderation, "summarize_description", _should_not_be_called)
+
+    # Reject path.
+    client.post("/report", data=_report_payload("reject-no-summary-marker"))
+    reject_id = _approve_and_get_id(client, moderator_auth)
+    client.post(f"/moderate/{reject_id}/reject", data={"notes": ""}, auth=moderator_auth)
+
+    # Resolve path — approve first with a *different*, allowed mock so this
+    # part of the test doesn't itself trip the assertion above, then swap
+    # the mock back before resolving.
+    monkeypatch.setattr(moderation, "summarize_description", lambda description: None)
+    client.post("/report", data=_report_payload("resolve-no-summary-marker"))
+    resolve_id = _approve_and_get_id(client, moderator_auth)
+    _approve(client, moderator_auth, resolve_id)
+
+    monkeypatch.setattr(moderation, "summarize_description", _should_not_be_called)
+    client.post(f"/moderate/{resolve_id}/resolve", auth=moderator_auth)

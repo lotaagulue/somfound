@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from somfound import crud
 from somfound.auth import require_moderator
 from somfound.db import get_session
+from somfound.llm_classifier import summarize_description
 from somfound.models import CATEGORY_LABELS, URGENCY_LABELS, Report, Status
 from somfound.paths import TEMPLATES_DIR
 
@@ -55,5 +56,15 @@ def moderate_action(
     if action not in {"approve", "reject", "resolve"}:
         raise HTTPException(status_code=400, detail="Unknown action")
 
-    crud.moderate_report(session, report, action=action, notes=notes, award_points=award_points)
+    # Only ever generated for what's actually about to go public, and only
+    # once — never re-summarized on subsequent moderation actions or map
+    # loads. See llm_classifier.summarize_description for the graceful-
+    # fallback behavior (None if too short to bother, no provider
+    # configured, or the call failed — the map just shows the full
+    # description in that case).
+    summary = summarize_description(report.description) if action == "approve" else None
+
+    crud.moderate_report(
+        session, report, action=action, notes=notes, award_points=award_points, summary=summary
+    )
     return RedirectResponse(url="/moderate", status_code=303)

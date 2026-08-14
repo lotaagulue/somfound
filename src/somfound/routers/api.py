@@ -59,6 +59,11 @@ def api_list_reports(
             "color": RESOLVED_COLOR if r.status == Status.RESOLVED else URGENCY_COLORS[r.urgency],
             "status": r.status.value,
             "description": r.description,
+            # AI-generated, short — "" if summarization was skipped (short
+            # description, no provider configured, call failed) or the
+            # report predates this feature. The map falls back to showing
+            # `description` whenever this is empty.
+            "summary": r.summary,
             "lat": r.lat,
             "lon": r.lon,
             "source_channel": r.source_channel.value,

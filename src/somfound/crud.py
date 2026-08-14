@@ -200,6 +200,7 @@ def moderate_report(
     category: Category | None = None,
     urgency: Urgency | None = None,
     award_points: int = 0,
+    summary: str | None = None,
 ) -> Report:
     now = datetime.now(timezone.utc)
     if category:
@@ -212,6 +213,13 @@ def moderate_report(
     if action == "approve":
         report.status = Status.PUBLISHED
         report.published_at = now
+        # AI-generated map-popup summary (see llm_classifier.summarize_description) —
+        # the caller (routers/moderation.py) only ever passes one on approval,
+        # and only when it actually got one back; `summary` stays "" (the
+        # model default) otherwise, which the map already treats as "show
+        # the full description instead."
+        if summary:
+            report.summary = summary
         # Reward-worthy tips (per the business plan's anonymous tip reward
         # system): a moderator can award points on approval, credited to
         # whichever wallet this report is linked to. Only ever set once —

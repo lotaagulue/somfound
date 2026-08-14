@@ -63,29 +63,36 @@ webhook — under `src/somfound/`:
   SMS's lead-with-a-keyword convention. Category/urgency are optional form fields; a blank one
   is auto-detected, an explicit one overrides the guess for that field only. Both functions are
   covered directly by `tests/test_sms_parser.py` with no DB/app needed.
-- **`llm_classifier.py`** — optional LLM fallback for the *same* auto-detection, used only when
-  `guess_category_urgency()` finds no keyword at all *and* the reporter left both fields blank
-  (not a second opinion on cases keywords already handle — keeps it limited to where it adds
-  value and keeps free-tier quota usage low). Two providers tried **in order**, Gemini then
-  Mistral — Mistral only runs if Gemini itself didn't produce a usable answer (unset, error,
-  timeout, bad response), a resilience fallback against one provider's outage/quota, never a
-  parallel second opinion. Each stage is independently dormant unless its own API key
-  (`GEMINI_API_KEY` / `MISTRAL_API_KEY`) is set, same pattern as `sms_client.py`: any failure
-  at any stage is caught and logged, falling through to the next stage or, if both are
-  exhausted, to the caller's existing `OTHER`/`MODERATE` default — neither provider's outage
-  can break report submission. Both use their SDK's structured-output mode
-  (`Category`/`Urgency` enum values baked into the JSON schema) rather than parsing freeform
-  text, with `_parse()` still validating defensively regardless. `_run_with_timeout()` enforces
-  its own hard wall-clock budget via `ThreadPoolExecutor` for both providers rather than
-  trusting either SDK's own timeout handling — verified necessary for Gemini specifically
-  (`http_options.timeout` has documented reliability issues upstream,
-  googleapis/python-genai#911 and #1330, and also a server-side *minimum* of 10s, too slow to
-  gate a request path on); Mistral's `timeout_ms` looked more trustworthy in testing but gets
-  the same treatment for consistency. `_call_gemini()`/`_call_mistral()` are split out
-  specifically so tests can monkeypatch just those functions (see `tests/test_llm_classifier.py`)
-  without a real API key or network access — the CI environment never has either. Model names
-  (`GEMINI_MODEL`/`MISTRAL_MODEL`) are configurable env vars rather than hardcoded, since
-  availability shifts over time and that shouldn't need a code change.
+- **`llm_classifier.py`** — two separate optional LLM-assisted features sharing one provider
+  infrastructure. **Classification** (`guess_category_urgency_with_llm`): fallback for
+  category/urgency auto-detection, used only when `guess_category_urgency()` finds no keyword
+  at all *and* the reporter left both fields blank (not a second opinion on cases keywords
+  already handle — keeps it limited to where it adds value and keeps free-tier quota usage
+  low). **Summarization** (`summarize_description`): a short AI summary of a report's full
+  description for the map popup ("see full details" reveals the original) — generated **once**,
+  at moderator-approval time (`routers/moderation.py`), cached on `Report.summary`, never
+  regenerated on every map load; skipped outright (no call at all) for descriptions under
+  `SUMMARY_SKIP_BELOW_CHARS` since summarizing something already short wouldn't help. Both
+  features share `_call_gemini()`/`_call_mistral()` (generic: a prompt string, plus an optional
+  `json_schema` for classification's structured output — `None` means plain-text output for
+  summarization) and the same fallback order: Gemini first, Mistral only if Gemini itself
+  didn't produce a usable answer (unset, error, timeout, bad/empty response) — a resilience
+  fallback against one provider's outage/quota, never a parallel second opinion. Each stage is
+  independently dormant unless its own API key (`GEMINI_API_KEY` / `MISTRAL_API_KEY`) is set,
+  same pattern as `sms_client.py`: any failure at any stage is caught and logged, falling
+  through to the next stage or, if both are exhausted, to the caller's existing fallback
+  (`OTHER`/`MODERATE`, or just the full description on the map) — neither provider's outage can
+  break report submission or hide a report's content. `_run_with_timeout()` enforces its own
+  hard wall-clock budget via `ThreadPoolExecutor` for both providers rather than trusting either
+  SDK's own timeout handling — verified necessary for Gemini specifically (`http_options.timeout`
+  has documented reliability issues upstream, googleapis/python-genai#911 and #1330, and also a
+  server-side *minimum* of 10s, too slow to gate a request path on); Mistral's `timeout_ms`
+  looked more trustworthy in testing but gets the same treatment for consistency.
+  `_call_gemini()`/`_call_mistral()` are split out specifically so tests can monkeypatch just
+  those functions (see `tests/test_llm_classifier.py`) without a real API key or network
+  access — the CI environment never has either. Model names (`GEMINI_MODEL`/`MISTRAL_MODEL`)
+  are configurable env vars rather than hardcoded, since availability shifts over time and that
+  shouldn't need a code change.
 - **`sms_service.py`** — `process_inbound_sms()`: the shared pipeline (parse → per-phone
   rate limit → create `Report` → log `SmsInbound`) used by both `POST /sms/inbound` (a real
   webhook, shaped for a future SMS gateway) and `/sms/simulate` (the in-app demo UI). Keep
@@ -130,11 +137,12 @@ webhook — under `src/somfound/`:
   leaves — it only creates *missing* tables, never alters existing ones — by hand-adding any
   columns current models need that an existing (e.g. live Supabase) table doesn't have yet. No
   Alembic yet; additive-only by design (add columns, never drop), since this runs
-  unconditionally on every startup against a real production DB. Five columns handled this way
+  unconditionally on every startup against a real production DB. Six columns handled this way
   so far (`Report.lga_id`, `.confirmations_count`, `.wallet_id`, `.points_awarded`,
-  `.submission_token` — each added when its feature shipped, each verified by rebuilding a DB
-  with the actual prior code before touching production, not just reasoned about). That's the
-  pattern to follow for the next one too — revisit reaching for a real migration framework once
+  `.submission_token`, `.summary` — each added when its feature shipped, each verified by
+  rebuilding a DB with the actual prior code before touching production, not just reasoned
+  about). That's the pattern to follow for the next one too — revisit reaching for a real
+  migration framework once
   this list gets much longer, but
   it's not there yet.
 - **`sms_client.py`** — optional outbound confirmation SMS via Africa's Talking. Their free

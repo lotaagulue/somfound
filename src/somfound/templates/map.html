@@ -128,10 +128,17 @@
     const confirmButton = resolved
       ? ''
       : `<br><button class="confirm-btn" onclick="confirmReport(${r.id}, this)">${confirmLabel}</button>`;
+    // r.summary is only ever set for descriptions long enough that a short
+    // AI summary actually helps (see llm_classifier.summarize_description) —
+    // "" for everything else, in which case this just shows the full
+    // description like before, no <details> wrapper needed.
+    const bodyHtml = r.summary
+      ? `${r.summary}<details class="popup-details"><summary>See full details</summary>${r.description}</details>`
+      : r.description;
     return (
       `<strong>${r.category_label}</strong> · ${resolved ? 'Resolved' : r.urgency_label}<br>` +
-      `${r.description}<br>` +
-      `<small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>` +
+      bodyHtml +
+      `<br><small>${new Date(r.created_at).toLocaleString()} · via ${r.source_channel}</small>` +
       confirmButton
     );
   }
